@@ -162,6 +162,7 @@
             // Visibility State
             const [isPeeking, setIsPeeking] = useState(false);
             const [peekSide, setPeekSide] = useState('bottom'); // 'left', 'right', 'bottom'
+            const [peekId, setPeekId] = useState(0); // Unique ID for every peek to force remount
             const [forceVisible, setForceVisible] = useState(false);
             const [visibilityReason, setVisibilityReason] = useState(''); // Text for speech bubble
             const [nextPeekTime, setNextPeekTime] = useState(null);
@@ -181,23 +182,24 @@
                     setNextPeekTime(Date.now() + delay);
                     
                     peekTimeoutRef.current = setTimeout(() => {
-                        // Pick random side
+                        // Pick random side & New ID
                         const sides = ['left', 'right', 'bottom'];
                         const randomSide = sides[Math.floor(Math.random() * sides.length)];
                         setPeekSide(randomSide);
+                        setPeekId(Date.now()); // FORCE RE-RENDER with new Key
                         
                         console.log(`[Streamagochi] Peeking from ${randomSide}!`);
                         
                         // Tiny delay to ensure DOM updates to new side's hidden position before animating in
                         setTimeout(() => {
                             setIsPeeking(true);
-                        }, 50);
+                        }, 100); // Increased delay slightly for safety
 
                         // Schedule Hide
                         hideTimeoutRef.current = setTimeout(() => {
                             setIsPeeking(false);
                             scheduleNextPeek();
-                        }, PEEK_DURATION_MS + 50);
+                        }, PEEK_DURATION_MS + 100);
                         
                     }, delay);
                 };
@@ -430,7 +432,7 @@
                     )}
 
                     {/* Key added to force remount on side change, fixing teleportation */}
-                    <div key={mode === 'peek' ? peekSide : 'fixed'} className={containerClass}>
+                    <div key={mode === 'peek' ? peekId : 'fixed'} className={containerClass}>
                         
                         <div className="relative flex flex-col items-center">
                             {/* Speech Bubble (For warnings/status) - Always show if reason exists */}
