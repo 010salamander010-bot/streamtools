@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial: The "First!" Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { font-family: 'Segoe UI', sans-serif; }</style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="max-w-3xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <a href="index.html" class="inline-flex items-center text-gray-400 hover:text-white mb-8 transition">
+            <i class="fa-solid fa-arrow-left mr-2"></i> Back to Hub
+        </a>
+        
+        <h1 class="text-4xl font-bold text-white mb-6">How to Setup the <span class="text-yellow-500">"First!"</span> Game</h1>
+        <p class="text-lg text-gray-400 mb-10">
+            A step-by-step guide to adding the competitive "First!" widget to your Twitch stream.
+        </p>
+
+        <!-- Step 1 -->
+        <div class="bg-gray-800 rounded-xl p-6 mb-8 border border-gray-700">
+            <h2 class="text-2xl font-bold text-white mb-4"><span class="bg-yellow-600 text-sm px-3 py-1 rounded-full align-middle mr-2">Step 1</span> Configure the Tool</h2>
+            <p class="mb-4">
+                Click the <strong>Use Tool</strong> button on the main page. You will see a setup screen.
+            </p>
+            <ul class="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                <li>Enter your <strong>Twitch Channel Name</strong>.</li>
+                <li>(Optional) Change the chat command (default is <code>!first</code>).</li>
+                <li>Click <strong>"Customize Look"</strong> to change the colors or the emoji (👑).</li>
+            </ul>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="bg-gray-800 rounded-xl p-6 mb-8 border border-gray-700">
+            <h2 class="text-2xl font-bold text-white mb-4"><span class="bg-yellow-600 text-sm px-3 py-1 rounded-full align-middle mr-2">Step 2</span> Get the Link</h2>
+            <p class="mb-4">
+                Once you click <strong>Start</strong>, look at your browser's address bar (or click the "Copy Link for OBS" button inside the tool).
+            </p>
+            <div class="bg-black/50 p-3 rounded font-mono text-sm text-green-400 break-all border border-gray-600">
+                https://.../first.html?channel=yourname&emoji=👑
+            </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="bg-gray-800 rounded-xl p-6 mb-8 border border-gray-700">
+            <h2 class="text-2xl font-bold text-white mb-4"><span class="bg-yellow-600 text-sm px-3 py-1 rounded-full align-middle mr-2">Step 3</span> Add to OBS</h2>
+            <ol class="list-decimal list-inside space-y-3 text-gray-300 ml-4">
+                <li>Open OBS Studio.</li>
+                <li>Under <strong>Sources</strong>, click <strong>+</strong> and select <strong>Browser</strong>.</li>
+                <li>Name it "First Game".</li>
+                <li>Paste the URL you copied into the <strong>URL</strong> field.</li>
+                <li>Set Width: <strong>1920</strong> and Height: <strong>1080</strong>.</li>
+                <li>Check <strong>"Refresh browser when scene becomes active"</strong>.</li>
+                <li>Click OK.</li>
+            </ol>
+        </div>
+
+        <!-- Admin Info -->
+        <div class="bg-gray-800/50 border border-yellow-500/30 rounded-xl p-6">
+            <h3 class="text-xl font-bold text-yellow-400 mb-2"><i class="fa-solid fa-shield-halved mr-2"></i> Admin Commands</h3>
+            <p class="text-gray-400">
+                If you need to reset the round early (e.g., for testing or if a bot won), type this in your chat:
+            </p>
+            <code class="block mt-2 bg-black/50 p-2 rounded text-yellow-200">!resetfirst</code>
+            <p class="text-xs text-gray-500 mt-2">*Only Broadcasters and Moderators can use this command.*</p>
+        </div>
+
+    </div>
+
+</body>
+</html>
