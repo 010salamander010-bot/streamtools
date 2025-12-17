@@ -58,13 +58,6 @@
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- CONFIGURATION ---
-        const PEEK_MIN_MS = 30 * 60 * 1000; // 30 Minutes
-        const PEEK_MAX_MS = 60 * 60 * 1000; // 60 Minutes
-        const PEEK_DURATION_MS = 8000; // Visible for 8 seconds
-        const DECAY_RATE_MS = 5000; 
-        const SAVE_INTERVAL_MS = 10000;
-        const CRITICAL_THRESHOLD = 20;
-        
         const DEFAULT_CONFIG = {
             petName: 'Glitch',
             color: '#a78bfa',
@@ -121,7 +114,20 @@
             
             // Config from URL
             const channel = getParam('channel') || localStorage.getItem('pet_channel') || '';
-            const mode = getParam('mode') || 'fixed'; // 'fixed' (default) or 'peek'
+            const isTest = getParam('test') === 'true'; // Check for ?test=true
+            
+            // Normalize 'mode' param to handle 'peak' typo
+            let modeParam = getParam('mode');
+            if (modeParam === 'peak') modeParam = 'peek'; // Fix common typo
+            const mode = modeParam === 'peek' ? 'peek' : 'fixed';
+
+            // TIMING CONFIG (Dynamic based on test mode)
+            const PEEK_MIN_MS = isTest ? 5000 : 30 * 60 * 1000; // 5 seconds in test, 30 mins normally
+            const PEEK_MAX_MS = isTest ? 10000 : 60 * 60 * 1000; // 10 seconds in test, 60 mins normally
+            const PEEK_DURATION_MS = isTest ? 5000 : 8000; // 5 seconds visible in test
+            const DECAY_RATE_MS = 5000; 
+            const SAVE_INTERVAL_MS = 10000;
+            const CRITICAL_THRESHOLD = 20;
 
             // State
             const [stats, setStats] = useState(() => {
@@ -165,7 +171,7 @@
                     clearTimeout(peekTimeoutRef.current);
                     clearTimeout(hideTimeoutRef.current);
                 };
-            }, [channel, mode]);
+            }, [channel, mode, PEEK_MIN_MS, PEEK_MAX_MS, PEEK_DURATION_MS]);
 
             // --- COUNTDOWN TIMER (Only for Peek Mode) ---
             useEffect(() => {
@@ -290,6 +296,7 @@
                     socket.send('PASS SCHMOOPIIE');
                     socket.send('NICK justinfan12345');
                     socket.send(`JOIN #${channel.toLowerCase()}`);
+                    setConnected(true);
                 };
 
                 socket.onmessage = (event) => {
@@ -344,10 +351,10 @@
             return (
                 <div className="relative flex flex-col items-center justify-end h-full w-full">
                     
-                    {/* Countdown (Peek Mode Only) */}
+                    {/* Countdown Timer (Only visible when pet is hidden AND in peek mode) */}
                     {mode === 'peek' && !visible && nextPeekTime && (
-                        <div className="absolute top-10 text-white/50 font-mono text-sm bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
-                            Next visit in: {timeRemaining}
+                        <div className="absolute top-10 text-white/50 font-mono text-sm bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm transition-opacity hover:opacity-100">
+                            {isTest ? "[TEST MODE] " : ""}Next visit in: {timeRemaining}
                         </div>
                     )}
 
