@@ -161,6 +161,7 @@
             
             // Visibility State
             const [isPeeking, setIsPeeking] = useState(false);
+            const [peekSide, setPeekSide] = useState('bottom'); // 'left', 'right', 'bottom'
             const [forceVisible, setForceVisible] = useState(false);
             const [visibilityReason, setVisibilityReason] = useState(''); // Text for speech bubble
             const [nextPeekTime, setNextPeekTime] = useState(null);
@@ -186,13 +187,17 @@
                         setPeekSide(randomSide);
                         
                         console.log(`[Streamagochi] Peeking from ${randomSide}!`);
-                        setIsPeeking(true);
+                        
+                        // Tiny delay to ensure DOM updates to new side's hidden position before animating in
+                        setTimeout(() => {
+                            setIsPeeking(true);
+                        }, 50);
 
                         // Schedule Hide
                         hideTimeoutRef.current = setTimeout(() => {
                             setIsPeeking(false);
                             scheduleNextPeek();
-                        }, PEEK_DURATION_MS);
+                        }, PEEK_DURATION_MS + 50);
                         
                     }, delay);
                 };
@@ -424,7 +429,8 @@
                         </div>
                     )}
 
-                    <div className={containerClass}>
+                    {/* Key added to force remount on side change, fixing teleportation */}
+                    <div key={mode === 'peek' ? peekSide : 'fixed'} className={containerClass}>
                         
                         <div className="relative flex flex-col items-center">
                             {/* Speech Bubble (For warnings/status) - Always show if reason exists */}
