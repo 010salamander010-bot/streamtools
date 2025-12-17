@@ -72,7 +72,7 @@
         .anim-sleep { animation: sleep 3s infinite ease-in-out; }
     </style>
 </head>
-<body class="bg-gray-900 text-white h-screen w-screen overflow-hidden">
+<body class="bg-gray-900 text-white h-screen w-screen flex flex-col items-center justify-center">
 
     <div id="root" class="w-full h-full"></div>
 
@@ -134,18 +134,19 @@
             // Helpers
             const getParam = (key) => new URLSearchParams(window.location.search).get(key);
             
-            // Config
+            // Config from URL
             const channel = getParam('channel') || localStorage.getItem('pet_channel') || '';
-            const isTest = getParam('test') === 'true'; 
+            const isTest = getParam('test') === 'true'; // Check for ?test=true
             
+            // Normalize 'mode' param to handle 'peak' typo
             let modeParam = getParam('mode');
-            if (modeParam === 'peak') modeParam = 'peek'; 
+            if (modeParam === 'peak') modeParam = 'peek'; // Fix common typo
             const mode = modeParam === 'peek' ? 'peek' : 'fixed';
 
-            // TIMING
-            const PEEK_MIN_MS = isTest ? 3000 : 30 * 60 * 1000; 
-            const PEEK_MAX_MS = isTest ? 8000 : 60 * 60 * 1000; 
-            const PEEK_DURATION_MS = isTest ? 4000 : 8000; 
+            // TIMING CONFIG (Dynamic based on test mode)
+            const PEEK_MIN_MS = isTest ? 5000 : 30 * 60 * 1000; // 5 seconds in test, 30 mins normally
+            const PEEK_MAX_MS = isTest ? 10000 : 60 * 60 * 1000; // 10 seconds in test, 60 mins normally
+            const PEEK_DURATION_MS = isTest ? 5000 : 8000; // 5 seconds visible in test
             const DECAY_RATE_MS = 5000; 
             const SAVE_INTERVAL_MS = 10000;
             const CRITICAL_THRESHOLD = 20;
@@ -158,11 +159,10 @@
             const [petStatus, setPetStatus] = useState('idle');
             const [feedback, setFeedback] = useState(null);
             
-            // Peek State
+            // Visibility State
             const [isPeeking, setIsPeeking] = useState(false);
-            const [peekSide, setPeekSide] = useState('bottom'); // 'left', 'right', 'bottom'
             const [forceVisible, setForceVisible] = useState(false);
-            const [visibilityReason, setVisibilityReason] = useState('');
+            const [visibilityReason, setVisibilityReason] = useState(''); // Text for speech bubble
             const [nextPeekTime, setNextPeekTime] = useState(null);
             const [timeRemaining, setTimeRemaining] = useState('');
 
@@ -188,6 +188,7 @@
                         console.log(`[Streamagochi] Peeking from ${randomSide}!`);
                         setIsPeeking(true);
 
+                        // Schedule Hide
                         hideTimeoutRef.current = setTimeout(() => {
                             setIsPeeking(false);
                             scheduleNextPeek();
@@ -204,13 +205,15 @@
                 };
             }, [channel, mode, PEEK_MIN_MS, PEEK_MAX_MS, PEEK_DURATION_MS]);
 
-            // --- COUNTDOWN (Dev/Test Only really) ---
+            // --- COUNTDOWN TIMER (Only for Peek Mode) ---
             useEffect(() => {
                 if (mode !== 'peek' || !nextPeekTime) return;
+                
                 const interval = setInterval(() => {
                     const diff = nextPeekTime - Date.now();
-                    if (diff <= 0) setTimeRemaining("Soon...");
-                    else {
+                    if (diff <= 0) {
+                        setTimeRemaining("Soon...");
+                    } else {
                         const mins = Math.floor(diff / 60000);
                         const secs = Math.floor((diff % 60000) / 1000);
                         setTimeRemaining(`${mins}m ${secs}s`);
@@ -226,36 +229,33 @@
                     return;
                 }
 
-                // In Peek Mode: Force visible ONLY if something is wrong or happening
+                // In Peek Mode: We only force visible for INTERACTIONS, not just low stats.
+                // Low stats will show a speech bubble only when it naturally peeks.
+                
                 const isHungry = stats.hunger < CRITICAL_THRESHOLD;
                 const isBored = stats.fun < CRITICAL_THRESHOLD;
                 const isTired = stats.energy < CRITICAL_THRESHOLD;
                 const isInteracting = petStatus === 'eating' || petStatus === 'playing';
                 const isDead = petStatus === 'dead';
 
+                // Set Bubble Text (Always ready for when it DOES peek)
                 if (isDead) {
-                    setForceVisible(true);
-                    setPeekSide('bottom'); // Dead/Critical always shows from bottom for clarity
                     setVisibilityReason('💀 !revive');
                 } else if (isHungry) {
-                    setForceVisible(true);
-                    setPeekSide('bottom');
                     setVisibilityReason('🍗 Hungry!');
                 } else if (isBored) {
-                    setForceVisible(true);
-                    setPeekSide('bottom');
                     setVisibilityReason('🎾 Bored!');
                 } else if (isTired) {
-                    setForceVisible(true);
-                    setPeekSide('bottom');
                     setVisibilityReason('💤 Tired!');
-                } else if (isInteracting) {
+                } else {
+                    setVisibilityReason('');
+                }
+
+                // Only force visible if User is Interacting (Feeding/Playing)
+                if (isInteracting) {
                     setForceVisible(true);
-                    // Don't change side during interaction, keep where it is
-                    setVisibilityReason(''); 
                 } else {
                     setForceVisible(false);
-                    setVisibilityReason('');
                 }
             }, [stats, petStatus, mode]);
 
@@ -301,11 +301,13 @@
             // --- COMMANDS ---
             const showFloatingText = (text) => {
                 setFeedback(text);
-                // Temporarily show pet for feedback if hidden
-                if (mode === 'peek' && !isPeeking && !forceVisible) {
-                    setPeekSide('bottom'); 
-                    setForceVisible(true);
-                    setTimeout(() => setForceVisible(false), 3000);
+                if(mode === 'peek') {
+                    // Temporarily show for feedback if hidden
+                    if (!isPeeking && !forceVisible) {
+                        setPeekSide('bottom'); 
+                        setForceVisible(true);
+                        setTimeout(() => setForceVisible(false), 3000);
+                    }
                 }
                 setTimeout(() => setFeedback(null), 3000);
             };
@@ -338,6 +340,7 @@
                  showFloatingText("✨ REVIVED!");
             }
 
+            // --- RESET LOGIC ---
             const resetStats = () => {
                 const newStats = { hunger: 100, fun: 100, energy: 100 };
                 setStats(newStats);
