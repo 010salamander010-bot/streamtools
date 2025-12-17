@@ -144,7 +144,7 @@
             const mode = modeParam === 'peek' ? 'peek' : 'fixed';
 
             // TIMING CONFIG (Dynamic based on test mode)
-            const PEEK_MIN_MS = isTest ? 5000 : 30 * 60 * 1000; // 5 seconds in test, 30 mins normally
+            const PEEK_MIN_MS = isTest ? 5000 : 10 * 60 * 1000; // 5 seconds in test, 10 mins normally
             const PEEK_MAX_MS = isTest ? 10000 : 60 * 60 * 1000; // 10 seconds in test, 60 mins normally
             const PEEK_DURATION_MS = isTest ? 5000 : 8000; // 5 seconds visible in test
             const DECAY_RATE_MS = 5000; 
@@ -424,10 +424,10 @@
 
             return (
                 <>
-                    {/* Countdown Timer (Only visible when pet is hidden AND in peek mode) */}
-                    {mode === 'peek' && !visible && nextPeekTime && (
+                    {/* Countdown Timer (Only visible when pet is hidden AND in peek mode AND in TEST mode) */}
+                    {mode === 'peek' && !visible && nextPeekTime && isTest && (
                         <div className="absolute top-10 left-1/2 -translate-x-1/2 text-white/50 font-mono text-sm bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm transition-opacity hover:opacity-100">
-                            {isTest ? "[TEST MODE] " : ""}Next visit in: {timeRemaining}
+                            [TEST MODE] Next visit in: {timeRemaining}
                         </div>
                     )}
 
