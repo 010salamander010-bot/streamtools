@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Streamagochi - Peek Mode</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Streamagochi</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,70 +23,22 @@
             background: transparent !important;
         }
 
-        /* Smooth Fade Transition for Peeking */
+        /* Smooth Fade Transition */
         .fade-container {
-            transition: opacity 3s ease-in-out;
+            transition: opacity 1s ease-in-out;
         }
         
         /* Blob Animations */
-        @keyframes breathe {
-            0%, 100% { transform: scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-            50% { transform: scale(1.05); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-        }
-        @keyframes jump {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-20px) scale(0.9); }
-        }
-        @keyframes shake {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(-10deg); }
-            75% { transform: rotate(10deg); }
-        }
-        @keyframes sleep {
-            0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; }
-            50% { transform: scale(0.95) rotate(1deg); opacity: 0.6; }
-        }
+        @keyframes breathe { 0%, 100% { transform: scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; } 50% { transform: scale(1.05); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; } }
+        @keyframes jump { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-20px) scale(0.9); } }
+        @keyframes shake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+        @keyframes sleep { 0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; } 50% { transform: scale(0.95) rotate(1deg); opacity: 0.6; } }
 
-        .blob {
-            width: 150px;
-            height: 150px;
-            background: var(--pet-color, #ff6b6b);
-            border: 4px solid rgba(0,0,0,0.2);
-            position: relative;
-            transition: all 0.5s ease;
-            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.1);
-        }
-        
-        .blob-face {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 60%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .eye {
-            width: 15px;
-            height: 15px;
-            background: #333;
-            border-radius: 50%;
-            animation: blink 4s infinite;
-        }
-        
-        .mouth {
-            width: 20px;
-            height: 10px;
-            border-bottom: 3px solid #333;
-            border-radius: 50%;
-        }
-
-        @keyframes blink {
-            0%, 96%, 100% { transform: scaleY(1); }
-            98% { transform: scaleY(0.1); }
-        }
+        .blob { width: 150px; height: 150px; background: var(--pet-color, #ff6b6b); border: 4px solid rgba(0,0,0,0.2); position: relative; transition: all 0.5s ease; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.1); }
+        .blob-face { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; display: flex; justify-content: space-between; align-items: center; }
+        .eye { width: 15px; height: 15px; background: #333; border-radius: 50%; animation: blink 4s infinite; }
+        .mouth { width: 20px; height: 10px; border-bottom: 3px solid #333; border-radius: 50%; }
+        @keyframes blink { 0%, 96%, 100% { transform: scaleY(1); } 98% { transform: scaleY(0.1); } }
         
         /* Status Bar Styles */
         .status-bar-bg { background: rgba(0,0,0,0.5); height: 8px; border-radius: 4px; overflow: hidden; width: 100%; }
@@ -103,17 +58,12 @@
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- CONFIGURATION ---
-        const TEST_MODE = false; // Set to true to make it peek every 10 seconds for testing
-        
-        // Peek Timing
-        const PEEK_MIN_MS = TEST_MODE ? 10000 : 30 * 60 * 1000; // 30 Minutes
-        const PEEK_MAX_MS = TEST_MODE ? 20000 : 60 * 60 * 1000; // 60 Minutes
+        const PEEK_MIN_MS = 30 * 60 * 1000; // 30 Minutes
+        const PEEK_MAX_MS = 60 * 60 * 1000; // 60 Minutes
         const PEEK_DURATION_MS = 8000; // Visible for 8 seconds
-        
-        // Stats
         const DECAY_RATE_MS = 5000; 
         const SAVE_INTERVAL_MS = 10000;
-        const CRITICAL_THRESHOLD = 20; // If any stat is below 20, force show
+        const CRITICAL_THRESHOLD = 20;
         
         const DEFAULT_CONFIG = {
             petName: 'Glitch',
@@ -166,10 +116,14 @@
         };
 
         function App() {
+            // Helpers
             const getParam = (key) => new URLSearchParams(window.location.search).get(key);
-            const [channel, setChannel] = useState(getParam('channel') || localStorage.getItem('pet_channel') || '');
             
-            // Core State
+            // Config from URL
+            const channel = getParam('channel') || localStorage.getItem('pet_channel') || '';
+            const mode = getParam('mode') || 'fixed'; // 'fixed' (default) or 'peek'
+
+            // State
             const [stats, setStats] = useState(() => {
                 const saved = localStorage.getItem('pet_stats');
                 return saved ? JSON.parse(saved) : { hunger: 80, fun: 80, energy: 80 };
@@ -179,52 +133,64 @@
             
             // Visibility State
             const [isPeeking, setIsPeeking] = useState(false);
-            const [forceVisible, setForceVisible] = useState(false); // True if interacting or critical stats
+            const [forceVisible, setForceVisible] = useState(false);
+            const [nextPeekTime, setNextPeekTime] = useState(null);
+            const [timeRemaining, setTimeRemaining] = useState('');
 
-            // Refs for Timers (So they don't reset on render)
+            // Refs
             const ws = useRef(null);
             const peekTimeoutRef = useRef(null);
             const hideTimeoutRef = useRef(null);
 
             // --- PEEK LOGIC ---
             useEffect(() => {
-                // If channel isn't set, don't start timer
-                if (!channel) return;
+                if (!channel || mode !== 'peek') return;
 
                 const scheduleNextPeek = () => {
-                    // Random time between MIN and MAX
                     const delay = Math.floor(Math.random() * (PEEK_MAX_MS - PEEK_MIN_MS) + PEEK_MIN_MS);
-                    console.log(`[Streamagochi] Next peek scheduled in ${(delay/1000/60).toFixed(2)} minutes.`);
+                    setNextPeekTime(Date.now() + delay);
                     
                     peekTimeoutRef.current = setTimeout(() => {
-                        console.log("[Streamagochi] Peeking now!");
                         setIsPeeking(true);
-
-                        // Schedule Hide
                         hideTimeoutRef.current = setTimeout(() => {
                             setIsPeeking(false);
-                            console.log("[Streamagochi] Hiding...");
-                            scheduleNextPeek(); // Loop
+                            scheduleNextPeek();
                         }, PEEK_DURATION_MS);
-                        
                     }, delay);
                 };
 
-                // Start the loop
                 scheduleNextPeek();
 
                 return () => {
                     clearTimeout(peekTimeoutRef.current);
                     clearTimeout(hideTimeoutRef.current);
                 };
-            }, [channel]);
+            }, [channel, mode]);
+
+            // --- COUNTDOWN TIMER (Only for Peek Mode) ---
+            useEffect(() => {
+                if (mode !== 'peek' || !nextPeekTime) return;
+                
+                const interval = setInterval(() => {
+                    const diff = nextPeekTime - Date.now();
+                    if (diff <= 0) {
+                        setTimeRemaining("Soon...");
+                    } else {
+                        const mins = Math.floor(diff / 60000);
+                        const secs = Math.floor((diff % 60000) / 1000);
+                        setTimeRemaining(`${mins}m ${secs}s`);
+                    }
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [nextPeekTime, mode]);
 
             // --- VISIBILITY CHECK ---
             useEffect(() => {
-                // Force visible if: 
-                // 1. Stats are Critical (< Threshold)
-                // 2. Pet is interacting (eating/playing)
-                // 3. Pet is Dead
+                if (mode === 'fixed') {
+                    setForceVisible(true);
+                    return;
+                }
+
                 const isCritical = stats.hunger < CRITICAL_THRESHOLD || stats.fun < CRITICAL_THRESHOLD || stats.energy < CRITICAL_THRESHOLD;
                 const isInteracting = petStatus === 'eating' || petStatus === 'playing';
                 const isDead = petStatus === 'dead';
@@ -234,9 +200,9 @@
                 } else {
                     setForceVisible(false);
                 }
-            }, [stats, petStatus]);
+            }, [stats, petStatus, mode]);
 
-            // --- TRANSPARENCY HANDLING ---
+            // --- TRANSPARENCY ---
             useEffect(() => {
                 if (channel) {
                     document.body.classList.add('obs-transparent');
@@ -258,7 +224,6 @@
                 const decay = setInterval(() => {
                     setStats(curr => {
                         let { hunger, fun, energy } = curr;
-                        
                         if (petStatus === 'sleeping') {
                             energy = Math.min(100, energy + 5);
                             hunger = Math.max(0, hunger - 2);
@@ -268,7 +233,6 @@
                             fun = Math.max(0, fun - 1);
                             energy = Math.max(0, energy - 0.5);
                         }
-
                         if (hunger === 0) setPetStatus('dead');
                         return { hunger, fun, energy };
                     });
@@ -280,10 +244,10 @@
             // --- COMMANDS ---
             const showFloatingText = (text) => {
                 setFeedback(text);
-                setForceVisible(true); // Ensure visible when interaction happens
+                if(mode === 'peek') setForceVisible(true); 
                 setTimeout(() => {
                     setFeedback(null);
-                    setForceVisible(false); // Let logic decide visibility again
+                    if(mode === 'peek') setForceVisible(false);
                 }, 3000);
             };
 
@@ -326,7 +290,6 @@
                     socket.send('PASS SCHMOOPIIE');
                     socket.send('NICK justinfan12345');
                     socket.send(`JOIN #${channel.toLowerCase()}`);
-                    setConnected(true);
                 };
 
                 socket.onmessage = (event) => {
@@ -349,7 +312,6 @@
                 };
 
                 socket.onclose = () => {
-                    setConnected(false);
                     setTimeout(connect, 5000); 
                 };
             }, [channel, petStatus]);
@@ -364,49 +326,58 @@
 
             // --- RENDER ---
             
-            // Setup Screen
             if (!channel) {
                 return (
                     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl">
                         <h1 className="text-2xl font-bold mb-4">Streamagochi Setup</h1>
-                        <input className="w-full bg-gray-700 p-2 rounded mb-4" placeholder="Channel Name" onKeyDown={(e) => { if (e.key === 'Enter') setChannel(e.target.value); }} />
-                        <button onClick={() => setChannel(document.querySelector('input').value)} className="bg-purple-600 w-full py-2 rounded font-bold">Start</button>
+                        <input className="w-full bg-gray-700 p-2 rounded mb-4" placeholder="Channel Name" id="setupChannel" />
+                        <button onClick={() => {
+                            const val = document.getElementById('setupChannel').value;
+                            if(val) window.location.search = `?channel=${val}`;
+                        }} className="bg-purple-600 w-full py-2 rounded font-bold">Start</button>
                     </div>
                 )
             }
 
-            // Determine if visible
             const visible = isPeeking || forceVisible;
 
-            // Pet Screen
             return (
-                <div className={`relative flex flex-col items-center justify-end h-full pb-4 w-64 fade-container ${visible ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="relative flex flex-col items-center justify-end h-full w-full">
                     
-                    {/* Status UI */}
-                    <div className={`bg-gray-900/80 p-2 rounded-lg w-full mb-4 transition-opacity duration-500 ${petStatus === 'dead' ? 'opacity-0' : 'opacity-100'}`}>
-                        <div className="flex justify-between text-xs text-gray-400 mb-1">
-                            <span>{DEFAULT_CONFIG.petName}</span>
-                            <span>Lv. 1</span>
+                    {/* Countdown (Peek Mode Only) */}
+                    {mode === 'peek' && !visible && nextPeekTime && (
+                        <div className="absolute top-10 text-white/50 font-mono text-sm bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
+                            Next visit in: {timeRemaining}
                         </div>
-                        <StatusBar icon="🍗" value={stats.hunger} color="#10b981" />
-                        <StatusBar icon="😊" value={stats.fun} color="#3b82f6" />
-                        <StatusBar icon="⚡" value={stats.energy} color="#f59e0b" />
+                    )}
+
+                    <div className={`flex flex-col items-center justify-end pb-4 w-64 fade-container ${visible ? 'opacity-100' : 'opacity-0'}`}>
+                        {/* Status UI */}
+                        <div className={`bg-gray-900/80 p-2 rounded-lg w-full mb-4 transition-opacity duration-500 ${petStatus === 'dead' ? 'opacity-0' : 'opacity-100'}`}>
+                            <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                <span>{DEFAULT_CONFIG.petName}</span>
+                                <span>Lv. 1</span>
+                            </div>
+                            <StatusBar icon="🍗" value={stats.hunger} color="#10b981" />
+                            <StatusBar icon="😊" value={stats.fun} color="#3b82f6" />
+                            <StatusBar icon="⚡" value={stats.energy} color="#f59e0b" />
+                        </div>
+
+                        {feedback && (
+                            <div className="absolute top-10 text-2xl font-bold text-white drop-shadow-md animate-bounce">
+                                {feedback}
+                            </div>
+                        )}
+
+                        <PetBlob status={petStatus} color={DEFAULT_CONFIG.color} />
+
+                        {petStatus === 'dead' && (
+                            <div className="absolute top-1/2 bg-black/80 p-4 rounded text-center">
+                                <h2 className="text-red-500 font-bold text-xl">OH NO!</h2>
+                                <p className="text-sm">Type !revive</p>
+                            </div>
+                        )}
                     </div>
-
-                    {feedback && (
-                        <div className="absolute top-10 text-2xl font-bold text-white drop-shadow-md animate-bounce">
-                            {feedback}
-                        </div>
-                    )}
-
-                    <PetBlob status={petStatus} color={DEFAULT_CONFIG.color} />
-
-                    {petStatus === 'dead' && (
-                        <div className="absolute top-1/2 bg-black/80 p-4 rounded text-center">
-                            <h2 className="text-red-500 font-bold text-xl">OH NO!</h2>
-                            <p className="text-sm">Type !revive</p>
-                        </div>
-                    )}
                 </div>
             );
         }
