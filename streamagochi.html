@@ -22,9 +22,15 @@
             background: transparent !important;
         }
 
-        .fade-container {
-            transition: opacity 1s ease-in-out, top 0.5s ease-out, left 0.5s ease-out;
-            position: absolute;
+        /* The container handles the sliding animation */
+        .sliding-container {
+            position: fixed;
+            transition: all 1s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         
         @keyframes breathe { 0%, 100% { transform: scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; } 50% { transform: scale(1.05); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; } }
@@ -32,10 +38,10 @@
         @keyframes shake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
         @keyframes sleep { 0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; } 50% { transform: scale(0.95) rotate(1deg); opacity: 0.6; } }
 
-        .blob { width: 120px; height: 120px; background: var(--pet-color, #ff6b6b); border: 4px solid rgba(0,0,0,0.2); position: relative; transition: all 0.5s ease; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.1); }
+        .blob { width: 100px; height: 100px; background: var(--pet-color, #ff6b6b); border: 4px solid rgba(0,0,0,0.2); position: relative; transition: all 0.5s ease; box-shadow: inset -8px -8px 16px rgba(0,0,0,0.15); }
         .blob-face { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; display: flex; justify-content: space-between; align-items: center; }
-        .eye { width: 12px; height: 12px; background: #333; border-radius: 50%; animation: blink 4s infinite; }
-        .mouth { width: 16px; height: 8px; border-bottom: 3px solid #333; border-radius: 50%; }
+        .eye { width: 10px; height: 10px; background: #333; border-radius: 50%; animation: blink 4s infinite; }
+        .mouth { width: 14px; height: 7px; border-bottom: 3px solid #333; border-radius: 50%; }
         @keyframes blink { 0%, 96%, 100% { transform: scaleY(1); } 98% { transform: scaleY(0.1); } }
         
         .status-bar-bg { background: rgba(0,0,0,0.5); height: 6px; border-radius: 3px; overflow: hidden; width: 100%; }
@@ -46,19 +52,28 @@
         .anim-happy { animation: jump 0.5s infinite; }
         .anim-sleep { animation: sleep 3s infinite ease-in-out; }
 
-        /* Distress Bubble */
         .bubble {
             position: absolute;
-            top: -40px;
-            right: -20px;
+            top: -45px;
             background: white;
-            padding: 4px 8px;
-            border-radius: 20px;
+            padding: 4px 10px;
+            border-radius: 15px;
             color: black;
             font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             font-size: 1.2rem;
-            animation: jump 1s infinite;
+            animation: jump 1.5s infinite;
+            z-index: 10;
+        }
+        .bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid white;
         }
     </style>
 </head>
@@ -70,13 +85,11 @@
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- CONFIGURATION ---
-        // Adjusted for testing (Shortened from 30m to 1m)
         const PEEK_MIN_MS = 60 * 1000; 
-        const PEEK_MAX_MS = 120 * 1000; 
-        const PEEK_DURATION_MS = 10000; // Visible for 10 seconds
+        const PEEK_MAX_MS = 180 * 1000; 
+        const PEEK_DURATION_MS = 8000; 
         const DECAY_RATE_MS = 5000; 
-        const SAVE_INTERVAL_MS = 10000;
-        const CRITICAL_THRESHOLD = 30; // Show warning emoji if stat < 30
+        const CRITICAL_THRESHOLD = 30;
         
         const DEFAULT_CONFIG = {
             petName: 'Glitch',
@@ -86,7 +99,7 @@
 
         const StatusBar = ({ icon, value, color }) => (
             <div className="flex items-center space-x-2 w-full mb-1">
-                <span className="text-sm">{icon}</span>
+                <span className="text-xs">{icon}</span>
                 <div className="flex-1 flex flex-col">
                     <div className="status-bar-bg">
                         <div className="status-fill" style={{ width: `${value}%`, backgroundColor: value < 30 ? '#ef4444' : color }}></div>
@@ -95,18 +108,23 @@
             </div>
         );
 
-        const PetBlob = ({ status, color, isCritical }) => {
+        const PetBlob = ({ status, color, stats }) => {
             let animClass = "anim-idle";
             let mouthStyle = {};
             let eyeStyle = {};
-            let distressEmoji = null;
+            let emoji = null;
 
-            if (isCritical) distressEmoji = "❗";
-            if (status === 'dead') distressEmoji = "💀";
+            // Determine emoji priority
+            if (status === 'dead') emoji = "💀";
+            else if (status === 'eating') emoji = "🍔";
+            else if (status === 'playing') emoji = "🎾";
+            else if (stats.hunger < CRITICAL_THRESHOLD) emoji = "🍔?";
+            else if (stats.fun < CRITICAL_THRESHOLD) emoji = "🎾?";
+            else if (stats.energy < CRITICAL_THRESHOLD) emoji = "⚡";
 
             if (status === 'eating') {
                 animClass = "anim-eat";
-                mouthStyle = { height: '15px', borderRadius: '50%', background: '#333' };
+                mouthStyle = { height: '12px', borderRadius: '50%', background: '#333' };
             } else if (status === 'playing') {
                 animClass = "anim-happy";
                 mouthStyle = { borderBottom: '3px solid #333', transform: 'scale(1.2)' };
@@ -121,13 +139,13 @@
 
             return (
                 <div className={`blob ${animClass}`} style={{ '--pet-color': color }}>
-                    {distressEmoji && <div className="bubble">{distressEmoji}</div>}
+                    {emoji && <div className="bubble">{emoji}</div>}
                     <div className="blob-face">
                         <div className="eye" style={eyeStyle}></div>
                         <div className="mouth" style={mouthStyle}></div>
                         <div className="eye" style={eyeStyle}></div>
                     </div>
-                    {status === 'sleeping' && <div className="absolute -top-10 left-0 text-xl font-bold text-white animate-pulse">Zzz...</div>}
+                    {status === 'sleeping' && <div className="absolute -top-12 left-0 text-xl font-bold text-white animate-pulse">Zzz...</div>}
                 </div>
             );
         };
@@ -144,263 +162,223 @@
             const [petStatus, setPetStatus] = useState('idle');
             const [feedback, setFeedback] = useState(null);
             
-            // Visibility & Positioning
-            const [isPeeking, setIsPeeking] = useState(false);
-            const [forceVisible, setForceVisible] = useState(false);
-            const [pos, setPos] = useState({ x: 50, y: 90 }); // Default: Bottom Center
+            // Peek State
+            const [isVisuallyActive, setIsVisuallyActive] = useState(mode === 'fixed');
+            const [peekConfig, setPeekConfig] = useState({ edge: 'bottom', offset: 50 });
             const [nextPeekTime, setNextPeekTime] = useState(null);
-            const [timeRemaining, setTimeRemaining] = useState('');
 
             const ws = useRef(null);
             const peekTimeoutRef = useRef(null);
             const hideTimeoutRef = useRef(null);
 
-            // --- POSITIONING HELPER ---
-            const randomizePosition = useCallback(() => {
-                const x = Math.floor(Math.random() * 80) + 10; // 10% to 90%
-                const y = Math.floor(Math.random() * 70) + 20; // 20% to 90%
-                setPos({ x, y });
+            // --- POSITIONING LOGIC ---
+            const randomizePeek = useCallback(() => {
+                const edges = ['top', 'bottom', 'left', 'right'];
+                const edge = edges[Math.floor(Math.random() * edges.length)];
+                const offset = Math.floor(Math.random() * 60) + 20; // 20% to 80% to avoid corners
+                setPeekConfig({ edge, offset });
             }, []);
 
-            // --- PEEK LOGIC ---
+            const triggerPeek = useCallback(() => {
+                if (isVisuallyActive && mode === 'peek') return; // Already visible
+                randomizePeek();
+                setIsVisuallyActive(true);
+                
+                if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+                
+                hideTimeoutRef.current = setTimeout(() => {
+                    setIsVisuallyActive(false);
+                }, PEEK_DURATION_MS);
+            }, [isVisuallyActive, mode, randomizePeek]);
+
+            // --- SCHEDULED PEEKS ---
             useEffect(() => {
                 if (!channel || mode !== 'peek') return;
 
-                const scheduleNextPeek = () => {
+                const scheduleNext = () => {
                     const delay = Math.floor(Math.random() * (PEEK_MAX_MS - PEEK_MIN_MS) + PEEK_MIN_MS);
                     setNextPeekTime(Date.now() + delay);
                     
                     peekTimeoutRef.current = setTimeout(() => {
-                        randomizePosition();
-                        setIsPeeking(true);
-                        hideTimeoutRef.current = setTimeout(() => {
-                            setIsPeeking(false);
-                            scheduleNextPeek();
-                        }, PEEK_DURATION_MS);
+                        triggerPeek();
+                        scheduleNext();
                     }, delay);
                 };
 
-                scheduleNextPeek();
-
+                scheduleNext();
                 return () => {
                     clearTimeout(peekTimeoutRef.current);
                     clearTimeout(hideTimeoutRef.current);
                 };
-            }, [channel, mode, randomizePosition]);
+            }, [channel, mode, triggerPeek]);
 
-            // --- COUNTDOWN ---
+            // --- CRITICAL AUTO-PEEK ---
             useEffect(() => {
-                if (mode !== 'peek' || !nextPeekTime) return;
-                const interval = setInterval(() => {
-                    const diff = nextPeekTime - Date.now();
-                    if (diff <= 0) setTimeRemaining("Soon...");
-                    else {
-                        const mins = Math.floor(diff / 60000);
-                        const secs = Math.floor((diff % 60000) / 1000);
-                        setTimeRemaining(`${mins}m ${secs}s`);
-                    }
-                }, 1000);
-                return () => clearInterval(interval);
-            }, [nextPeekTime, mode]);
+                if (mode !== 'peek') return;
+                const isCritical = stats.hunger < CRITICAL_THRESHOLD || stats.fun < CRITICAL_THRESHOLD || stats.energy < CRITICAL_THRESHOLD || petStatus === 'dead';
+                
+                if (isCritical && !isVisuallyActive) {
+                    triggerPeek();
+                }
+            }, [stats, petStatus, mode, isVisuallyActive, triggerPeek]);
 
-            // --- CRITICAL CHECK ---
-            const isCritical = stats.hunger < CRITICAL_THRESHOLD || stats.fun < CRITICAL_THRESHOLD || stats.energy < CRITICAL_THRESHOLD;
-
-            useEffect(() => {
+            // --- STYLE CALCULATOR ---
+            const getSlidingStyles = () => {
                 if (mode === 'fixed') {
-                    setForceVisible(true);
-                    setPos({ x: 50, y: 90 });
-                    return;
+                    return { bottom: '20px', left: '50%', transform: 'translateX(-50%)', opacity: 1 };
                 }
 
-                const isInteracting = petStatus === 'eating' || petStatus === 'playing';
-                const isDead = petStatus === 'dead';
+                const offscreenBuffer = '-150px';
+                const onscreenBuffer = '20px';
+                const { edge, offset } = peekConfig;
 
-                if (isCritical || isInteracting || isDead) {
-                    // If we weren't already visible, pick a spot
-                    if (!forceVisible && !isPeeking) randomizePosition();
-                    setForceVisible(true);
-                } else {
-                    setForceVisible(false);
-                }
-            }, [stats, petStatus, mode, isCritical, isPeeking, forceVisible, randomizePosition]);
+                let styles = { opacity: isVisuallyActive ? 1 : 0 };
 
-            // --- UI HANDLING ---
-            useEffect(() => {
-                if (channel) {
-                    document.body.classList.add('obs-transparent');
-                    document.body.classList.remove('bg-gray-900');
-                } else {
-                    document.body.classList.remove('obs-transparent');
-                    document.body.classList.add('bg-gray-900');
+                if (edge === 'bottom') {
+                    styles.bottom = isVisuallyActive ? onscreenBuffer : offscreenBuffer;
+                    styles.left = `${offset}%`;
+                    styles.transform = 'translateX(-50%)';
+                } else if (edge === 'top') {
+                    styles.top = isVisuallyActive ? onscreenBuffer : offscreenBuffer;
+                    styles.left = `${offset}%`;
+                    styles.transform = 'translateX(-50%)';
+                } else if (edge === 'left') {
+                    styles.left = isVisuallyActive ? onscreenBuffer : offscreenBuffer;
+                    styles.top = `${offset}%`;
+                    styles.transform = 'translateY(-50%)';
+                } else if (edge === 'right') {
+                    styles.right = isVisuallyActive ? onscreenBuffer : offscreenBuffer;
+                    styles.top = `${offset}%`;
+                    styles.transform = 'translateY(-50%)';
                 }
-            }, [channel]);
+
+                return styles;
+            };
 
             // --- GAME LOOP ---
             useEffect(() => {
-                const interval = setInterval(() => {
-                    localStorage.setItem('pet_stats', JSON.stringify(stats));
-                }, SAVE_INTERVAL_MS);
-                
-                if (petStatus === 'dead') return () => clearInterval(interval);
-
                 const decay = setInterval(() => {
                     setStats(curr => {
                         let { hunger, fun, energy } = curr;
                         if (petStatus === 'sleeping') {
-                            energy = Math.min(100, energy + 5);
-                            hunger = Math.max(0, hunger - 1.5);
+                            energy = Math.min(100, energy + 4);
+                            hunger = Math.max(0, hunger - 1);
                             if (energy >= 100) setPetStatus('idle');
                         } else {
-                            hunger = Math.max(0, hunger - 0.8);
-                            fun = Math.max(0, fun - 0.8);
-                            energy = Math.max(0, energy - 0.4);
+                            hunger = Math.max(0, hunger - 0.5);
+                            fun = Math.max(0, fun - 0.5);
+                            energy = Math.max(0, energy - 0.2);
                         }
                         if (hunger <= 0) setPetStatus('dead');
-                        return { hunger, fun, energy };
+                        return { ...curr, hunger, fun, energy };
                     });
                 }, DECAY_RATE_MS);
 
-                return () => { clearInterval(interval); clearInterval(decay); };
-            }, [petStatus]);
+                const save = setInterval(() => {
+                    localStorage.setItem('pet_stats', JSON.stringify(stats));
+                }, 10000);
+
+                return () => { clearInterval(decay); clearInterval(save); };
+            }, [petStatus, stats]);
 
             // --- ACTIONS ---
-            const showFloatingText = (text) => {
+            const showFeedback = (text) => {
                 setFeedback(text);
+                triggerPeek(); // Always show pet when someone interacts
                 setTimeout(() => setFeedback(null), 3000);
             };
 
             const feed = () => {
                 if (petStatus === 'dead' || petStatus === 'sleeping') return;
-                setStats(s => ({ ...s, hunger: Math.min(100, s.hunger + 20) }));
+                setStats(s => ({ ...s, hunger: Math.min(100, s.hunger + 25) }));
                 setPetStatus('eating');
-                showFloatingText("🍔 Yummy!");
-                setTimeout(() => setPetStatus('idle'), 2000);
+                showFeedback("🍔 YUM!");
+                setTimeout(() => setPetStatus('idle'), 3000);
             };
 
             const play = () => {
                 if (petStatus === 'dead' || petStatus === 'sleeping') return;
-                setStats(s => ({ ...s, fun: Math.min(100, s.fun + 20), energy: Math.max(0, s.energy - 8) }));
+                setStats(s => ({ ...s, fun: Math.min(100, s.fun + 25), energy: Math.max(0, s.energy - 10) }));
                 setPetStatus('playing');
-                showFloatingText("🎾 Yay!");
-                setTimeout(() => setPetStatus('idle'), 2000);
+                showFeedback("🎾 YAY!");
+                setTimeout(() => setPetStatus('idle'), 3000);
             };
 
             const sleep = () => {
                 if (petStatus === 'dead') return;
                 setPetStatus('sleeping');
-                showFloatingText("💤 Nap time");
+                showFeedback("💤 ZZZ...");
             };
-            
+
             const revive = () => {
-                 setStats({ hunger: 60, fun: 60, energy: 60 });
+                 setStats({ hunger: 70, fun: 70, energy: 70 });
                  setPetStatus('idle');
-                 showFloatingText("✨ REVIVED!");
-            }
+                 showFeedback("✨ ALIVE!");
+            };
 
             // --- TWITCH ---
-            const connect = useCallback(() => {
+            useEffect(() => {
                 if (!channel) return;
                 const socket = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
-                ws.current = socket;
-
                 socket.onopen = () => {
-                    socket.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+                    socket.send('CAP REQ :twitch.tv/commands');
                     socket.send('PASS SCHMOOPIIE');
                     socket.send('NICK justinfan123');
                     socket.send(`JOIN #${channel.toLowerCase()}`);
                 };
+                socket.onmessage = (e) => {
+                    const msg = e.data;
+                    if (msg.startsWith('PING')) socket.send('PONG :tmi.twitch.tv');
+                    const text = msg.split('PRIVMSG')[1]?.split(':').slice(1).join(':').trim().toLowerCase();
+                    if (!text) return;
 
-                socket.onmessage = (event) => {
-                    const data = event.data;
-                    if (data.startsWith('PING')) { socket.send('PONG :tmi.twitch.tv'); return; }
-                    if (!data.includes('PRIVMSG')) return;
-
-                    const parts = data.split(' ');
-                    const msgIdx = parts.indexOf('PRIVMSG');
-                    if (msgIdx === -1) return;
-
-                    let message = parts.slice(msgIdx + 2).join(' ');
-                    if (message.startsWith(':')) message = message.substring(1);
-                    message = message.trim().toLowerCase();
-
-                    if (message.startsWith('!feed')) feed();
-                    if (message.startsWith('!play') || message.startsWith('!pet')) play();
-                    if (message.startsWith('!sleep')) sleep();
-                    if (message.startsWith('!revive') && petStatus === 'dead') revive();
+                    if (text.startsWith('!feed')) feed();
+                    if (text.startsWith('!play') || text.startsWith('!pet')) play();
+                    if (text.startsWith('!sleep')) sleep();
+                    if (text.startsWith('!revive')) revive();
                 };
-
-                socket.onclose = () => { setTimeout(connect, 5000); };
+                return () => socket.close();
             }, [channel, petStatus]);
 
-            useEffect(() => {
-                if (channel) {
-                    localStorage.setItem('pet_channel', channel);
-                    connect();
-                }
-                return () => { if (ws.current) ws.current.close(); };
-            }, [connect, channel]);
-
+            // --- UI ---
             if (!channel) {
                 return (
                     <div className="flex items-center justify-center h-full">
-                        <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-80">
-                            <h1 className="text-2xl font-bold mb-4">Streamagochi Setup</h1>
-                            <input className="w-full bg-gray-700 p-2 rounded mb-4" placeholder="Twitch Channel" id="setupChannel" />
-                            <button onClick={() => {
-                                const val = document.getElementById('setupChannel').value;
-                                if(val) window.location.search = `?channel=${val}&mode=peek`;
-                            }} className="bg-purple-600 w-full py-2 rounded font-bold">Start Peek Mode</button>
-                            <p className="text-xs text-gray-400 mt-4 text-center">Pet appears randomly and when commands are used.</p>
+                        <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-96 border border-purple-500/30">
+                            <h1 className="text-3xl font-bold mb-2 text-purple-400">Streamagochi</h1>
+                            <p className="text-gray-400 mb-6 text-sm">A tiny friend that peeks into your stream.</p>
+                            <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg mb-4 focus:border-purple-500 outline-none" placeholder="Twitch Channel Name" id="c" />
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=peek`} className="bg-purple-600 hover:bg-purple-500 py-3 rounded-lg font-bold transition-colors">Peek Mode</button>
+                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=fixed`} className="bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-bold transition-colors">Fixed Mode</button>
+                            </div>
                         </div>
                     </div>
-                )
+                );
             }
-
-            const visible = isPeeking || forceVisible;
 
             return (
                 <div className="w-full h-full relative">
-                    
-                    {/* Countdown Debugger */}
-                    {mode === 'peek' && !visible && nextPeekTime && (
-                        <div className="absolute bottom-4 right-4 text-white/30 font-mono text-[10px] bg-black/20 px-2 py-1 rounded">
-                            T- {timeRemaining}
-                        </div>
-                    )}
-
-                    <div 
-                        className={`fade-container ${visible ? 'opacity-100' : 'opacity-0'}`}
-                        style={{ 
-                            left: `${pos.x}%`, 
-                            top: `${pos.y}%`, 
-                            transform: 'translate(-50%, -50%)',
-                            pointerEvents: visible ? 'auto' : 'none'
-                        }}
-                    >
-                        {/* Feedback Text */}
-                        {feedback && (
-                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 text-lg font-bold text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] animate-bounce whitespace-nowrap">
-                                {feedback}
-                            </div>
-                        )}
-
-                        <div className="flex flex-col items-center">
-                            {/* Status UI */}
-                            <div className={`bg-black/60 backdrop-blur-sm p-2 rounded-lg w-32 mb-2 transition-opacity duration-500 ${petStatus === 'dead' ? 'opacity-0' : 'opacity-100'}`}>
+                    {/* Floating Pet Container */}
+                    <div className="sliding-container" style={getSlidingStyles()}>
+                        
+                        {/* Status UI - Only visible in fixed mode */}
+                        {mode === 'fixed' && (
+                            <div className="bg-black/70 backdrop-blur-md p-3 rounded-xl w-36 mb-4 border border-white/10 shadow-xl">
                                 <StatusBar icon="🍗" value={stats.hunger} color="#10b981" />
                                 <StatusBar icon="😊" value={stats.fun} color="#3b82f6" />
                                 <StatusBar icon="⚡" value={stats.energy} color="#f59e0b" />
                             </div>
+                        )}
 
-                            <PetBlob status={petStatus} color={DEFAULT_CONFIG.color} isCritical={isCritical} />
+                        {/* Feedback Text (Commands) */}
+                        {feedback && (
+                            <div className="absolute -top-16 text-xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] animate-bounce text-center w-48">
+                                {feedback}
+                            </div>
+                        )}
 
-                            {petStatus === 'dead' && (
-                                <div className="mt-2 bg-red-900/80 p-2 rounded text-center scale-75">
-                                    <p className="text-xs font-bold whitespace-nowrap">!revive</p>
-                                </div>
-                            )}
-                        </div>
+                        <PetBlob status={petStatus} color={DEFAULT_CONFIG.color} stats={stats} />
                     </div>
                 </div>
             );
