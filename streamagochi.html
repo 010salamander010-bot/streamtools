@@ -15,9 +15,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        /* Base transparency for OBS */
+        /* CRITICAL: OBS Transparency */
         html, body { 
             background-color: transparent !important; 
+            background: transparent !important;
             margin: 0; 
             padding: 0; 
             width: 100vw; 
@@ -32,7 +33,7 @@
             height: 100%;
         }
 
-        /* The container handles the sliding animation */
+        /* Container for the sliding pet */
         .sliding-container {
             position: fixed;
             transition: all 1.2s cubic-bezier(0.22, 1, 0.36, 1);
@@ -41,6 +42,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            background-color: transparent !important;
         }
         
         @keyframes breathe { 0%, 100% { transform: scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; } 50% { transform: scale(1.05); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; } }
@@ -48,7 +50,15 @@
         @keyframes shake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
         @keyframes sleep { 0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; } 50% { transform: scale(0.95) rotate(1deg); opacity: 0.6; } }
 
-        .blob { width: 100px; height: 100px; background: var(--pet-color, #ff6b6b); border: 4px solid rgba(0,0,0,0.2); position: relative; transition: all 0.5s ease; box-shadow: inset -8px -8px 16px rgba(0,0,0,0.15); }
+        .blob { 
+            width: 100px; 
+            height: 100px; 
+            background: var(--pet-color, #ff6b6b); 
+            border: 4px solid rgba(0,0,0,0.2); 
+            position: relative; 
+            transition: all 0.5s ease; 
+            box-shadow: inset -8px -8px 16px rgba(0,0,0,0.15); 
+        }
         .blob-face { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; display: flex; justify-content: space-between; align-items: center; }
         .eye { width: 10px; height: 10px; background: #333; border-radius: 50%; animation: blink 4s infinite; }
         .mouth { width: 14px; height: 7px; border-bottom: 3px solid #333; border-radius: 50%; }
@@ -94,19 +104,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
 
-        // --- CONFIGURATION ---
-        const PEEK_MIN_MS = 30 * 60 * 1000; // 30 minutes
-        const PEEK_MAX_MS = 60 * 60 * 1000; // 60 minutes
-        const PEEK_DURATION_MS = 7000;      // Visible for 7 seconds
-        const DECAY_RATE_MS = 5000; 
-        const CRITICAL_THRESHOLD = 30;
-        
-        const DEFAULT_CONFIG = {
-            petName: 'Glitch',
-            color: '#a78bfa',
-            maxStat: 100
-        };
-
         const StatusBar = ({ icon, value, color }) => (
             <div className="flex items-center space-x-2 w-full mb-1">
                 <span className="text-xs">{icon}</span>
@@ -118,7 +115,7 @@
             </div>
         );
 
-        const PetBlob = ({ status, color, stats }) => {
+        const PetBlob = ({ status, color, stats, threshold }) => {
             let animClass = "anim-idle";
             let mouthStyle = {};
             let eyeStyle = {};
@@ -127,9 +124,9 @@
             if (status === 'dead') emoji = "💀";
             else if (status === 'eating') emoji = "🍔";
             else if (status === 'playing') emoji = "🎾";
-            else if (stats.hunger < CRITICAL_THRESHOLD) emoji = "🍔?";
-            else if (stats.fun < CRITICAL_THRESHOLD) emoji = "🎾?";
-            else if (stats.energy < CRITICAL_THRESHOLD) emoji = "⚡";
+            else if (stats.hunger < threshold) emoji = "🍔?";
+            else if (stats.fun < threshold) emoji = "🎾?";
+            else if (stats.energy < threshold) emoji = "⚡";
 
             if (status === 'eating') {
                 animClass = "anim-eat";
@@ -163,6 +160,16 @@
             const getParam = (key) => new URLSearchParams(window.location.search).get(key);
             const channel = getParam('channel') || localStorage.getItem('pet_channel') || '';
             const mode = getParam('mode') || 'fixed'; 
+            const isTest = getParam('test') === 'true';
+
+            // --- CONFIGURATION ---
+            const PEEK_MIN_MS = isTest ? 5000 : 30 * 60 * 1000;
+            const PEEK_MAX_MS = isTest ? 10000 : 60 * 60 * 1000;
+            const PEEK_DURATION_MS = 7000;
+            const DECAY_RATE_MS = 5000; 
+            const CRITICAL_THRESHOLD = 30;
+            const CMD_BOOST = 12; // Lower boost per command (was 25)
+            const DECAY_AMT = 0.2; // Slower decay (was 0.4)
 
             const [stats, setStats] = useState(() => {
                 const saved = localStorage.getItem('pet_stats');
@@ -170,14 +177,12 @@
             });
             const [petStatus, setPetStatus] = useState('idle');
             const [feedback, setFeedback] = useState(null);
-            
             const [isVisuallyActive, setIsVisuallyActive] = useState(mode === 'fixed');
             const [peekConfig, setPeekConfig] = useState({ edge: 'bottom', offset: 50 });
 
             const ws = useRef(null);
             const hideTimeoutRef = useRef(null);
 
-            // Randomize position while invisible
             const randomizePeek = useCallback(() => {
                 const edges = ['top', 'bottom', 'left', 'right'];
                 const edge = edges[Math.floor(Math.random() * edges.length)];
@@ -188,18 +193,16 @@
             const triggerPeek = useCallback(() => {
                 if (isVisuallyActive && mode === 'peek') return; 
                 
-                // Teleport to random edge while invisible
                 randomizePeek();
                 
-                // Small delay to let React process the position change before sliding in
+                // Allow state for position to update while invisible
                 setTimeout(() => {
                     setIsVisuallyActive(true);
-                    
                     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
                     hideTimeoutRef.current = setTimeout(() => {
                         if (mode === 'peek') setIsVisuallyActive(false);
                     }, PEEK_DURATION_MS);
-                }, 50);
+                }, 100);
             }, [isVisuallyActive, mode, randomizePeek]);
 
             // --- SCHEDULED PEEKS ---
@@ -215,7 +218,7 @@
                 };
 
                 scheduleNext();
-            }, [channel, mode, triggerPeek]);
+            }, [channel, mode, triggerPeek, PEEK_MIN_MS, PEEK_MAX_MS]);
 
             // --- CRITICAL AUTO-PEEK ---
             useEffect(() => {
@@ -227,9 +230,9 @@
             const getSlidingStyles = () => {
                 if (mode === 'fixed') return { bottom: '20px', left: '50%', transform: 'translateX(-50%)', opacity: 1 };
 
-                // Logic: Blob is 100px. Hide 30%, show 70% (70px).
-                // Onscreen buffer should be -30px relative to the edge.
-                const offscreenBuffer = '-160px';
+                // 70/30 visibility: Blob is 100px. 
+                // Hide 30px (30%), show 70px.
+                const offscreenBuffer = '-180px';
                 const onscreenBuffer = '-30px'; 
                 
                 const { edge, offset } = peekConfig;
@@ -255,29 +258,30 @@
                 return styles;
             };
 
+            // --- GAME LOOP ---
             useEffect(() => {
                 const decay = setInterval(() => {
                     setStats(curr => {
                         let { hunger, fun, energy } = curr;
                         if (petStatus === 'sleeping') {
-                            energy = Math.min(100, energy + 4);
-                            hunger = Math.max(0, hunger - 1);
+                            energy = Math.min(100, energy + 3);
+                            hunger = Math.max(0, hunger - (DECAY_AMT / 2));
                             if (energy >= 100) setPetStatus('idle');
                         } else {
-                            hunger = Math.max(0, hunger - 0.4);
-                            fun = Math.max(0, fun - 0.4);
-                            energy = Math.max(0, energy - 0.2);
+                            hunger = Math.max(0, hunger - DECAY_AMT);
+                            fun = Math.max(0, fun - DECAY_AMT);
+                            energy = Math.max(0, energy - (DECAY_AMT / 2));
                         }
                         if (hunger <= 0) setPetStatus('dead');
                         return { ...curr, hunger, fun, energy };
                     });
                 }, DECAY_RATE_MS);
                 return () => clearInterval(decay);
-            }, [petStatus]);
+            }, [petStatus, DECAY_AMT]);
 
             const feed = () => {
                 if (petStatus === 'dead' || petStatus === 'sleeping') return;
-                setStats(s => ({ ...s, hunger: Math.min(100, s.hunger + 25) }));
+                setStats(s => ({ ...s, hunger: Math.min(100, s.hunger + CMD_BOOST) }));
                 setPetStatus('eating');
                 setFeedback("🍔 YUM!");
                 triggerPeek();
@@ -286,7 +290,7 @@
 
             const play = () => {
                 if (petStatus === 'dead' || petStatus === 'sleeping') return;
-                setStats(s => ({ ...s, fun: Math.min(100, s.fun + 25), energy: Math.max(0, s.energy - 10) }));
+                setStats(s => ({ ...s, fun: Math.min(100, s.fun + CMD_BOOST), energy: Math.max(0, s.energy - (CMD_BOOST / 2)) }));
                 setPetStatus('playing');
                 setFeedback("🎾 YAY!");
                 triggerPeek();
@@ -333,16 +337,17 @@
                 return () => socket.close();
             }, [channel, petStatus]);
 
+            // --- UI RENDER ---
             if (!channel) {
                 return (
-                    <div className="flex items-center justify-center h-full bg-gray-900">
+                    <div className="flex items-center justify-center h-full bg-transparent">
                         <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-96 border border-purple-500/30">
                             <h1 className="text-3xl font-bold mb-2 text-purple-400">Streamagochi</h1>
-                            <p className="text-gray-400 mb-6 text-sm">Overlay setup</p>
-                            <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg mb-4 text-white outline-none" placeholder="Twitch Channel" id="c" />
+                            <p className="text-gray-400 mb-6 text-sm">Twitch Overlay Setup</p>
+                            <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg mb-4 text-white outline-none focus:border-purple-500" placeholder="Twitch Channel" id="c" />
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=peek`} className="bg-purple-600 p-3 rounded-lg font-bold">Peek Mode</button>
-                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=fixed`} className="bg-gray-700 p-3 rounded-lg font-bold">Fixed Mode</button>
+                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=peek&test=true`} className="bg-purple-600 p-3 rounded-lg font-bold hover:bg-purple-500">Start Test Mode</button>
+                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=peek`} className="bg-gray-700 p-3 rounded-lg font-bold hover:bg-gray-600">Start Real Mode</button>
                             </div>
                         </div>
                     </div>
@@ -350,10 +355,11 @@
             }
 
             return (
-                <div className="w-full h-full relative">
+                <div className="w-full h-full relative bg-transparent">
                     <div className="sliding-container" style={getSlidingStyles()}>
+                        {/* Only show stats in FIXED mode, never in PEEK mode */}
                         {mode === 'fixed' && (
-                            <div className="bg-black/70 backdrop-blur-md p-3 rounded-xl w-36 mb-4 border border-white/10 shadow-xl">
+                            <div className="bg-black/80 p-3 rounded-xl w-36 mb-4 border border-white/10 shadow-xl">
                                 <StatusBar icon="🍗" value={stats.hunger} color="#10b981" />
                                 <StatusBar icon="😊" value={stats.fun} color="#3b82f6" />
                                 <StatusBar icon="⚡" value={stats.energy} color="#f59e0b" />
@@ -364,7 +370,12 @@
                                 {feedback}
                             </div>
                         )}
-                        <PetBlob status={petStatus} color={DEFAULT_CONFIG.color} stats={stats} />
+                        <PetBlob 
+                            status={petStatus} 
+                            color="#a78bfa" 
+                            stats={stats} 
+                            threshold={CRITICAL_THRESHOLD} 
+                        />
                     </div>
                 </div>
             );
