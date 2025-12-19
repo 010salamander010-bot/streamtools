@@ -15,17 +15,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        body { font-family: 'Segoe UI', sans-serif; overflow: hidden; margin: 0; padding: 0; width: 100vw; height: 100vh; }
-        
-        .obs-transparent { 
+        /* Base transparency for OBS */
+        html, body { 
             background-color: transparent !important; 
-            background: transparent !important;
+            margin: 0; 
+            padding: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            overflow: hidden; 
+            font-family: 'Segoe UI', sans-serif;
+        }
+        
+        #root {
+            background-color: transparent !important;
+            width: 100%;
+            height: 100%;
         }
 
         /* The container handles the sliding animation */
         .sliding-container {
             position: fixed;
-            transition: all 1s cubic-bezier(0.22, 1, 0.36, 1);
+            transition: all 1.2s cubic-bezier(0.22, 1, 0.36, 1);
             z-index: 999;
             display: flex;
             flex-direction: column;
@@ -77,17 +87,17 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body class="text-white">
 
-    <div id="root" class="w-full h-full relative"></div>
+    <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- CONFIGURATION ---
-        const PEEK_MIN_MS = 60 * 1000; 
-        const PEEK_MAX_MS = 180 * 1000; 
-        const PEEK_DURATION_MS = 8000; 
+        const PEEK_MIN_MS = 30 * 60 * 1000; // 30 minutes
+        const PEEK_MAX_MS = 60 * 60 * 1000; // 60 minutes
+        const PEEK_DURATION_MS = 7000;      // Visible for 7 seconds
         const DECAY_RATE_MS = 5000; 
         const CRITICAL_THRESHOLD = 30;
         
@@ -114,7 +124,6 @@
             let eyeStyle = {};
             let emoji = null;
 
-            // Determine emoji priority
             if (status === 'dead') emoji = "💀";
             else if (status === 'eating') emoji = "🍔";
             else if (status === 'playing') emoji = "🎾";
@@ -162,33 +171,35 @@
             const [petStatus, setPetStatus] = useState('idle');
             const [feedback, setFeedback] = useState(null);
             
-            // Peek State
             const [isVisuallyActive, setIsVisuallyActive] = useState(mode === 'fixed');
             const [peekConfig, setPeekConfig] = useState({ edge: 'bottom', offset: 50 });
-            const [nextPeekTime, setNextPeekTime] = useState(null);
 
             const ws = useRef(null);
-            const peekTimeoutRef = useRef(null);
             const hideTimeoutRef = useRef(null);
 
-            // --- POSITIONING LOGIC ---
+            // Randomize position while invisible
             const randomizePeek = useCallback(() => {
                 const edges = ['top', 'bottom', 'left', 'right'];
                 const edge = edges[Math.floor(Math.random() * edges.length)];
-                const offset = Math.floor(Math.random() * 60) + 20; // 20% to 80% to avoid corners
+                const offset = Math.floor(Math.random() * 60) + 20; 
                 setPeekConfig({ edge, offset });
             }, []);
 
             const triggerPeek = useCallback(() => {
-                if (isVisuallyActive && mode === 'peek') return; // Already visible
+                if (isVisuallyActive && mode === 'peek') return; 
+                
+                // Teleport to random edge while invisible
                 randomizePeek();
-                setIsVisuallyActive(true);
                 
-                if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-                
-                hideTimeoutRef.current = setTimeout(() => {
-                    setIsVisuallyActive(false);
-                }, PEEK_DURATION_MS);
+                // Small delay to let React process the position change before sliding in
+                setTimeout(() => {
+                    setIsVisuallyActive(true);
+                    
+                    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+                    hideTimeoutRef.current = setTimeout(() => {
+                        if (mode === 'peek') setIsVisuallyActive(false);
+                    }, PEEK_DURATION_MS);
+                }, 50);
             }, [isVisuallyActive, mode, randomizePeek]);
 
             // --- SCHEDULED PEEKS ---
@@ -197,41 +208,31 @@
 
                 const scheduleNext = () => {
                     const delay = Math.floor(Math.random() * (PEEK_MAX_MS - PEEK_MIN_MS) + PEEK_MIN_MS);
-                    setNextPeekTime(Date.now() + delay);
-                    
-                    peekTimeoutRef.current = setTimeout(() => {
+                    setTimeout(() => {
                         triggerPeek();
                         scheduleNext();
                     }, delay);
                 };
 
                 scheduleNext();
-                return () => {
-                    clearTimeout(peekTimeoutRef.current);
-                    clearTimeout(hideTimeoutRef.current);
-                };
             }, [channel, mode, triggerPeek]);
 
             // --- CRITICAL AUTO-PEEK ---
             useEffect(() => {
                 if (mode !== 'peek') return;
                 const isCritical = stats.hunger < CRITICAL_THRESHOLD || stats.fun < CRITICAL_THRESHOLD || stats.energy < CRITICAL_THRESHOLD || petStatus === 'dead';
-                
-                if (isCritical && !isVisuallyActive) {
-                    triggerPeek();
-                }
+                if (isCritical && !isVisuallyActive) triggerPeek();
             }, [stats, petStatus, mode, isVisuallyActive, triggerPeek]);
 
-            // --- STYLE CALCULATOR ---
             const getSlidingStyles = () => {
-                if (mode === 'fixed') {
-                    return { bottom: '20px', left: '50%', transform: 'translateX(-50%)', opacity: 1 };
-                }
+                if (mode === 'fixed') return { bottom: '20px', left: '50%', transform: 'translateX(-50%)', opacity: 1 };
 
-                const offscreenBuffer = '-150px';
-                const onscreenBuffer = '20px';
+                // Logic: Blob is 100px. Hide 30%, show 70% (70px).
+                // Onscreen buffer should be -30px relative to the edge.
+                const offscreenBuffer = '-160px';
+                const onscreenBuffer = '-30px'; 
+                
                 const { edge, offset } = peekConfig;
-
                 let styles = { opacity: isVisuallyActive ? 1 : 0 };
 
                 if (edge === 'bottom') {
@@ -251,11 +252,9 @@
                     styles.top = `${offset}%`;
                     styles.transform = 'translateY(-50%)';
                 }
-
                 return styles;
             };
 
-            // --- GAME LOOP ---
             useEffect(() => {
                 const decay = setInterval(() => {
                     setStats(curr => {
@@ -265,58 +264,51 @@
                             hunger = Math.max(0, hunger - 1);
                             if (energy >= 100) setPetStatus('idle');
                         } else {
-                            hunger = Math.max(0, hunger - 0.5);
-                            fun = Math.max(0, fun - 0.5);
+                            hunger = Math.max(0, hunger - 0.4);
+                            fun = Math.max(0, fun - 0.4);
                             energy = Math.max(0, energy - 0.2);
                         }
                         if (hunger <= 0) setPetStatus('dead');
                         return { ...curr, hunger, fun, energy };
                     });
                 }, DECAY_RATE_MS);
-
-                const save = setInterval(() => {
-                    localStorage.setItem('pet_stats', JSON.stringify(stats));
-                }, 10000);
-
-                return () => { clearInterval(decay); clearInterval(save); };
-            }, [petStatus, stats]);
-
-            // --- ACTIONS ---
-            const showFeedback = (text) => {
-                setFeedback(text);
-                triggerPeek(); // Always show pet when someone interacts
-                setTimeout(() => setFeedback(null), 3000);
-            };
+                return () => clearInterval(decay);
+            }, [petStatus]);
 
             const feed = () => {
                 if (petStatus === 'dead' || petStatus === 'sleeping') return;
                 setStats(s => ({ ...s, hunger: Math.min(100, s.hunger + 25) }));
                 setPetStatus('eating');
-                showFeedback("🍔 YUM!");
-                setTimeout(() => setPetStatus('idle'), 3000);
+                setFeedback("🍔 YUM!");
+                triggerPeek();
+                setTimeout(() => { setPetStatus('idle'); setFeedback(null); }, 3000);
             };
 
             const play = () => {
                 if (petStatus === 'dead' || petStatus === 'sleeping') return;
                 setStats(s => ({ ...s, fun: Math.min(100, s.fun + 25), energy: Math.max(0, s.energy - 10) }));
                 setPetStatus('playing');
-                showFeedback("🎾 YAY!");
-                setTimeout(() => setPetStatus('idle'), 3000);
+                setFeedback("🎾 YAY!");
+                triggerPeek();
+                setTimeout(() => { setPetStatus('idle'); setFeedback(null); }, 3000);
             };
 
             const sleep = () => {
                 if (petStatus === 'dead') return;
                 setPetStatus('sleeping');
-                showFeedback("💤 ZZZ...");
+                setFeedback("💤 ZZZ...");
+                triggerPeek();
+                setTimeout(() => setFeedback(null), 3000);
             };
 
             const revive = () => {
                  setStats({ hunger: 70, fun: 70, energy: 70 });
                  setPetStatus('idle');
-                 showFeedback("✨ ALIVE!");
+                 setFeedback("✨ ALIVE!");
+                 triggerPeek();
+                 setTimeout(() => setFeedback(null), 3000);
             };
 
-            // --- TWITCH ---
             useEffect(() => {
                 if (!channel) return;
                 const socket = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
@@ -329,9 +321,10 @@
                 socket.onmessage = (e) => {
                     const msg = e.data;
                     if (msg.startsWith('PING')) socket.send('PONG :tmi.twitch.tv');
-                    const text = msg.split('PRIVMSG')[1]?.split(':').slice(1).join(':').trim().toLowerCase();
+                    const parts = msg.split('PRIVMSG');
+                    if (!parts[1]) return;
+                    const text = parts[1].split(':').slice(1).join(':').trim().toLowerCase();
                     if (!text) return;
-
                     if (text.startsWith('!feed')) feed();
                     if (text.startsWith('!play') || text.startsWith('!pet')) play();
                     if (text.startsWith('!sleep')) sleep();
@@ -340,17 +333,16 @@
                 return () => socket.close();
             }, [channel, petStatus]);
 
-            // --- UI ---
             if (!channel) {
                 return (
-                    <div className="flex items-center justify-center h-full">
+                    <div className="flex items-center justify-center h-full bg-gray-900">
                         <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-96 border border-purple-500/30">
                             <h1 className="text-3xl font-bold mb-2 text-purple-400">Streamagochi</h1>
-                            <p className="text-gray-400 mb-6 text-sm">A tiny friend that peeks into your stream.</p>
-                            <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg mb-4 focus:border-purple-500 outline-none" placeholder="Twitch Channel Name" id="c" />
+                            <p className="text-gray-400 mb-6 text-sm">Overlay setup</p>
+                            <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg mb-4 text-white outline-none" placeholder="Twitch Channel" id="c" />
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=peek`} className="bg-purple-600 hover:bg-purple-500 py-3 rounded-lg font-bold transition-colors">Peek Mode</button>
-                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=fixed`} className="bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-bold transition-colors">Fixed Mode</button>
+                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=peek`} className="bg-purple-600 p-3 rounded-lg font-bold">Peek Mode</button>
+                                <button onClick={() => window.location.search = `?channel=${document.getElementById('c').value}&mode=fixed`} className="bg-gray-700 p-3 rounded-lg font-bold">Fixed Mode</button>
                             </div>
                         </div>
                     </div>
@@ -359,10 +351,7 @@
 
             return (
                 <div className="w-full h-full relative">
-                    {/* Floating Pet Container */}
                     <div className="sliding-container" style={getSlidingStyles()}>
-                        
-                        {/* Status UI - Only visible in fixed mode */}
                         {mode === 'fixed' && (
                             <div className="bg-black/70 backdrop-blur-md p-3 rounded-xl w-36 mb-4 border border-white/10 shadow-xl">
                                 <StatusBar icon="🍗" value={stats.hunger} color="#10b981" />
@@ -370,14 +359,11 @@
                                 <StatusBar icon="⚡" value={stats.energy} color="#f59e0b" />
                             </div>
                         )}
-
-                        {/* Feedback Text (Commands) */}
                         {feedback && (
                             <div className="absolute -top-16 text-xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] animate-bounce text-center w-48">
                                 {feedback}
                             </div>
                         )}
-
                         <PetBlob status={petStatus} color={DEFAULT_CONFIG.color} stats={stats} />
                     </div>
                 </div>
