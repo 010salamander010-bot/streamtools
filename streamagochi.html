@@ -168,8 +168,8 @@
             const PEEK_DURATION_MS = 7000;
             const DECAY_RATE_MS = 5000; 
             const CRITICAL_THRESHOLD = 30;
-            const CMD_BOOST = 12; // Lower boost per command (was 25)
-            const DECAY_AMT = 0.2; // Slower decay (was 0.4)
+            const CMD_BOOST = 8; // Even lower boost per command
+            const DECAY_AMT = 0.08; // Even slower decay
 
             const [stats, setStats] = useState(() => {
                 const saved = localStorage.getItem('pet_stats');
@@ -180,8 +180,15 @@
             const [isVisuallyActive, setIsVisuallyActive] = useState(mode === 'fixed');
             const [peekConfig, setPeekConfig] = useState({ edge: 'bottom', offset: 50 });
 
-            const ws = useRef(null);
+            // Using refs to keep tracking stable without triggering useEffect loops
+            const activeRef = useRef(mode === 'fixed');
+            const modeRef = useRef(mode);
             const hideTimeoutRef = useRef(null);
+            const scheduledTimeoutRef = useRef(null);
+
+            useEffect(() => {
+                activeRef.current = isVisuallyActive;
+            }, [isVisuallyActive]);
 
             const randomizePeek = useCallback(() => {
                 const edges = ['top', 'bottom', 'left', 'right'];
@@ -191,19 +198,18 @@
             }, []);
 
             const triggerPeek = useCallback(() => {
-                if (isVisuallyActive && mode === 'peek') return; 
+                if (activeRef.current && modeRef.current === 'peek') return; 
                 
                 randomizePeek();
                 
-                // Allow state for position to update while invisible
                 setTimeout(() => {
                     setIsVisuallyActive(true);
                     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
                     hideTimeoutRef.current = setTimeout(() => {
-                        if (mode === 'peek') setIsVisuallyActive(false);
+                        if (modeRef.current === 'peek') setIsVisuallyActive(false);
                     }, PEEK_DURATION_MS);
                 }, 100);
-            }, [isVisuallyActive, mode, randomizePeek]);
+            }, [randomizePeek, PEEK_DURATION_MS]);
 
             // --- SCHEDULED PEEKS ---
             useEffect(() => {
@@ -211,13 +217,14 @@
 
                 const scheduleNext = () => {
                     const delay = Math.floor(Math.random() * (PEEK_MAX_MS - PEEK_MIN_MS) + PEEK_MIN_MS);
-                    setTimeout(() => {
+                    scheduledTimeoutRef.current = setTimeout(() => {
                         triggerPeek();
                         scheduleNext();
                     }, delay);
                 };
 
                 scheduleNext();
+                return () => clearTimeout(scheduledTimeoutRef.current);
             }, [channel, mode, triggerPeek, PEEK_MIN_MS, PEEK_MAX_MS]);
 
             // --- CRITICAL AUTO-PEEK ---
@@ -230,8 +237,6 @@
             const getSlidingStyles = () => {
                 if (mode === 'fixed') return { bottom: '20px', left: '50%', transform: 'translateX(-50%)', opacity: 1 };
 
-                // 70/30 visibility: Blob is 100px. 
-                // Hide 30px (30%), show 70px.
                 const offscreenBuffer = '-180px';
                 const onscreenBuffer = '-30px'; 
                 
@@ -264,7 +269,7 @@
                     setStats(curr => {
                         let { hunger, fun, energy } = curr;
                         if (petStatus === 'sleeping') {
-                            energy = Math.min(100, energy + 3);
+                            energy = Math.min(100, energy + 2.5);
                             hunger = Math.max(0, hunger - (DECAY_AMT / 2));
                             if (energy >= 100) setPetStatus('idle');
                         } else {
@@ -357,7 +362,6 @@
             return (
                 <div className="w-full h-full relative bg-transparent">
                     <div className="sliding-container" style={getSlidingStyles()}>
-                        {/* Only show stats in FIXED mode, never in PEEK mode */}
                         {mode === 'fixed' && (
                             <div className="bg-black/80 p-3 rounded-xl w-36 mb-4 border border-white/10 shadow-xl">
                                 <StatusBar icon="🍗" value={stats.hunger} color="#10b981" />
