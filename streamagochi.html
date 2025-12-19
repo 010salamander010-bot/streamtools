@@ -36,13 +36,13 @@
         /* Container for the sliding pet */
         .sliding-container {
             position: fixed;
-            transition: all 1.2s cubic-bezier(0.22, 1, 0.36, 1);
             z-index: 999;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             background-color: transparent !important;
+            /* Transition is applied dynamically to allow 'teleporting' while hidden */
         }
         
         @keyframes breathe { 0%, 100% { transform: scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; } 50% { transform: scale(1.05); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; } }
@@ -168,8 +168,8 @@
             const PEEK_DURATION_MS = 7000;
             const DECAY_RATE_MS = 5000; 
             const CRITICAL_THRESHOLD = 30;
-            const CMD_BOOST = 8; // Even lower boost per command
-            const DECAY_AMT = 0.08; // Even slower decay
+            const CMD_BOOST = 6; // Slower progress filling
+            const DECAY_AMT = 0.04; // Much slower decay
 
             const [stats, setStats] = useState(() => {
                 const saved = localStorage.getItem('pet_stats');
@@ -177,12 +177,12 @@
             });
             const [petStatus, setPetStatus] = useState('idle');
             const [feedback, setFeedback] = useState(null);
+            
             const [isVisuallyActive, setIsVisuallyActive] = useState(mode === 'fixed');
             const [peekConfig, setPeekConfig] = useState({ edge: 'bottom', offset: 50 });
+            const [transitionEnabled, setTransitionEnabled] = useState(true);
 
-            // Using refs to keep tracking stable without triggering useEffect loops
             const activeRef = useRef(mode === 'fixed');
-            const modeRef = useRef(mode);
             const hideTimeoutRef = useRef(null);
             const scheduledTimeoutRef = useRef(null);
 
@@ -198,18 +198,23 @@
             }, []);
 
             const triggerPeek = useCallback(() => {
-                if (activeRef.current && modeRef.current === 'peek') return; 
+                if (activeRef.current && mode === 'peek') return; 
                 
+                // 1. Disable transitions to teleport instantly while invisible
+                setTransitionEnabled(false);
                 randomizePeek();
                 
+                // 2. Wait for DOM to register position, then enable transition and slide in
                 setTimeout(() => {
+                    setTransitionEnabled(true);
                     setIsVisuallyActive(true);
+                    
                     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
                     hideTimeoutRef.current = setTimeout(() => {
-                        if (modeRef.current === 'peek') setIsVisuallyActive(false);
+                        if (mode === 'peek') setIsVisuallyActive(false);
                     }, PEEK_DURATION_MS);
                 }, 100);
-            }, [randomizePeek, PEEK_DURATION_MS]);
+            }, [mode, randomizePeek, PEEK_DURATION_MS]);
 
             // --- SCHEDULED PEEKS ---
             useEffect(() => {
@@ -235,13 +240,24 @@
             }, [stats, petStatus, mode, isVisuallyActive, triggerPeek]);
 
             const getSlidingStyles = () => {
-                if (mode === 'fixed') return { bottom: '20px', left: '50%', transform: 'translateX(-50%)', opacity: 1 };
+                if (mode === 'fixed') return { 
+                    bottom: '20px', 
+                    left: '50%', 
+                    transform: 'translateX(-50%)', 
+                    opacity: 1,
+                    transition: 'all 1.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                };
 
+                // Logic: Blob is 100px. Hide 30%, show 70% (70px).
+                // Onscreen buffer should be -30px relative to the edge.
                 const offscreenBuffer = '-180px';
                 const onscreenBuffer = '-30px'; 
                 
                 const { edge, offset } = peekConfig;
-                let styles = { opacity: isVisuallyActive ? 1 : 0 };
+                let styles = { 
+                    opacity: isVisuallyActive ? 1 : 0,
+                    transition: transitionEnabled ? 'all 1.2s cubic-bezier(0.22, 1, 0.36, 1)' : 'none'
+                };
 
                 if (edge === 'bottom') {
                     styles.bottom = isVisuallyActive ? onscreenBuffer : offscreenBuffer;
@@ -269,7 +285,7 @@
                     setStats(curr => {
                         let { hunger, fun, energy } = curr;
                         if (petStatus === 'sleeping') {
-                            energy = Math.min(100, energy + 2.5);
+                            energy = Math.min(100, energy + 2);
                             hunger = Math.max(0, hunger - (DECAY_AMT / 2));
                             if (energy >= 100) setPetStatus('idle');
                         } else {
