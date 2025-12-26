@@ -139,8 +139,9 @@
                     <div class="mt-4 bg-gray-700/50 p-3 rounded text-xs text-gray-400 border border-gray-600">
                         <span class="font-bold text-white">Mod Guide:</span> 
                         <code class="text-green-400 ml-1">!sorsolás</code> to join.
-                        <span class="text-red-400 ml-1">Ban/Timeout</span> a user to remove them silently.
+                        <span class="text-red-400 ml-1">Ban/Timeout</span> to remove.
                         <code class="text-yellow-400 ml-1">!gaclose</code> to draw.
+                        <code class="text-blue-400 ml-1">!gareset</code> to new round.
                     </div>
                 </div>
             </div>
@@ -310,7 +311,7 @@
         document.getElementById('btn-clear').addEventListener('click', () => {
             if(confirm("Clear local list? (Obs will keep its list unless you restart it)")) {
                 state.participants.clear();
-                updateUI();
+                updateUI(null, 'reset');
             }
         });
 
@@ -321,47 +322,46 @@
 
         // ================= CHAT LOGIC (CORE) =================
         function initComfy() {
-            // Sanitize Channel Name (Remove URLs, spaces, slashes)
-            const rawChannel = state.config.channel;
-            if(!rawChannel) return;
-            const channel = rawChannel.replace(/^(https?:\/\/)?(www\.)?twitch\.tv\//, '').replace(/[^a-zA-Z0-9_]/g, '');
+            if(!state.config.channel) return;
+            const channel = state.config.channel.trim();
 
-            try { ComfyJS.Disconnect(); } catch(e){}
-            
-            ComfyJS.onCommand = handleCommand;
-            
-            // --- NEW: Auto-Remove on Ban/Timeout ---
-            ComfyJS.onBan = (channel, username) => {
-                silentRemove(username);
-            };
-            ComfyJS.onTimeout = (channel, username, duration, message) => {
-                silentRemove(username);
-            };
+            // Simple connection logic - mimics Version 1
+            try {
+                // We do NOT disconnect aggressively to prevent race conditions
+                // We just re-bind listeners
+                ComfyJS.onCommand = handleCommand;
+                
+                // Auto-Remove Logic (Keep this feature)
+                ComfyJS.onBan = (channel, username) => silentRemove(username);
+                ComfyJS.onTimeout = (channel, username, duration, message) => silentRemove(username);
 
-            ComfyJS.onConnected = () => {
-                state.isOpen = true;
-                if(state.mode === 'admin') {
-                    els.adminStatus.innerText = "Connected: " + channel;
-                    els.adminStatus.className = "text-green-500 font-mono";
-                } else {
-                    els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]";
-                    els.overlayStatusText.innerText = "Listening";
-                }
-            };
-            
-            ComfyJS.onConnectionError = (error) => {
-                 console.error("ComfyJS Error:", error);
-                 if(state.mode === 'admin') {
-                    els.adminStatus.innerText = "Connection Failed!";
-                    els.adminStatus.className = "text-red-500 font-bold";
-                 } else {
-                    els.overlayStatusText.innerText = "Connect Fail";
-                    els.statusDot.className = "w-3 h-3 rounded-full bg-red-500";
-                 }
-            };
+                ComfyJS.onConnected = () => {
+                    state.isOpen = true; // Ensure giveaway is open when connected
+                    console.log("Connected to " + channel);
+                    if(state.mode === 'admin') {
+                        els.adminStatus.innerText = "Connected: " + channel;
+                        els.adminStatus.className = "text-green-500 font-mono";
+                    } else {
+                        els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]";
+                        els.overlayStatusText.innerText = "Listening";
+                    }
+                };
+                
+                ComfyJS.onConnectionError = (error) => {
+                     console.error("Connection Error", error);
+                     if(state.mode === 'admin') {
+                        els.adminStatus.innerText = "Connection Failed";
+                        els.adminStatus.className = "text-red-500 font-bold";
+                     } else {
+                        els.overlayStatusText.innerText = "Error";
+                        els.statusDot.className = "w-3 h-3 rounded-full bg-red-500";
+                     }
+                };
 
-            console.log("Connecting to Twitch channel:", channel);
-            ComfyJS.Init(channel);
+                ComfyJS.Init(channel);
+            } catch (e) {
+                console.error("Init Error", e);
+            }
         }
 
         function silentRemove(username) {
@@ -370,7 +370,6 @@
                 if (p.toLowerCase() === target) {
                     state.participants.delete(p);
                     updateUI(p, 'remove');
-                    console.log(`Removed ${p} due to Ban/Timeout/Command`);
                 }
             }
         }
@@ -397,22 +396,51 @@
             if (cmd === 'gaclose' && (flags.mod || flags.broadcaster)) {
                 runDraw();
             }
+            
+            // --- RESET ---
+            if (cmd === 'gareset' && (flags.mod || flags.broadcaster)) {
+                resetGiveaway();
+            }
+        }
+
+        function resetGiveaway() {
+            state.participants.clear();
+            state.isOpen = true;
+            updateUI(null, 'reset');
+            
+            if (state.mode === 'obs') {
+                els.winnerContainer.innerHTML = '';
+                els.winnerContainer.classList.add('hidden');
+                els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]";
+                els.overlayStatusText.innerText = "Listening";
+            } else {
+                showAdminToast("Round Reset! Ready for new entries.");
+            }
         }
 
         // ================= UI UPDATES =================
         function updateUI(user, action) {
             // OBS
             if (state.mode === 'obs') {
+                if (action === 'reset') {
+                    els.overlayCount.innerText = '0';
+                    return;
+                }
                 els.overlayCount.innerText = state.participants.size;
                 if (action === 'add') {
                     els.overlayCount.classList.add('scale-125', 'text-green-400');
                     setTimeout(() => els.overlayCount.classList.remove('scale-125', 'text-green-400'), 200);
                 }
-                // Note: We deliberately DO NOT show an animation for 'remove' to keep it hidden
             }
 
             // ADMIN
             if (state.mode === 'admin') {
+                if (action === 'reset') {
+                     els.adminCount.innerText = '0';
+                     els.participantList.innerHTML = '';
+                     els.emptyState.classList.remove('hidden');
+                     return;
+                }
                 els.adminCount.innerText = state.participants.size;
                 
                 if (action === 'add') {
@@ -443,8 +471,6 @@
 
         // Exposed to global scope for the button onclick
         window.removeUser = (user) => {
-            // Fallback to !garemove if they prefer clicking, 
-            // but now banning works too.
             const cmd = `!garemove ${user}`;
             navigator.clipboard.writeText(cmd).then(() => {
                 showAdminToast(`Copied: "${cmd}" - Paste in Chat!`);
