@@ -324,6 +324,17 @@
         function initComfy() {
             if(!state.config.channel) return;
 
+            // Visual feedback immediately for Admin
+            if(state.mode === 'admin') {
+                els.adminStatus.innerText = "Connecting...";
+                els.adminStatus.className = "text-yellow-500 font-mono";
+            }
+
+            // Force disconnect to ensure clean state before reconnecting
+            try {
+                ComfyJS.Disconnect();
+            } catch(e) { }
+
             ComfyJS.onCommand = handleCommand;
             
             // Auto-Remove Logic (Keep this feature)
