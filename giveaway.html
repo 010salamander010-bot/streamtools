@@ -4,83 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SalamanderBot Giveaway v1.7</title>
-    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
     <style>
-        /* Base styles */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        /* OBS Overlay specific */
         body.mode-obs { background-color: rgba(0, 0, 0, 0); overflow: hidden; }
-        
-        /* Admin specific */
         body.mode-admin { background-color: #111827; color: #e5e7eb; overflow-y: auto; }
-
-        /* Animations */
         .fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        
         .fade-out-down { animation: fadeOutDown 0.5s ease-in forwards; }
         @keyframes fadeOutDown { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }
-
         .slide-in-right { animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
-
-        /* Winner Card Styles */
-        .winner-card {
-            background: rgba(23, 23, 23, 0.95);
-            border: 2px solid #a855f7;
-            box-shadow: 0 0 30px rgba(168, 85, 247, 0.4);
-        }
-
-        /* Entry Popup Styles */
-        .entry-popup {
-            background: rgba(17, 24, 39, 0.9);
-            border-left: 4px solid #34d399;
-            backdrop-filter: blur(4px);
-        }
-
-        /* Admin Table */
+        .winner-card { background: rgba(23, 23, 23, 0.95); border: 2px solid #a855f7; box-shadow: 0 0 30px rgba(168, 85, 247, 0.4); }
+        .entry-popup { background: rgba(17, 24, 39, 0.9); border-left: 4px solid #34d399; backdrop-filter: blur(4px); }
         .admin-table-row:nth-child(even) { background-color: rgba(255,255,255,0.05); }
     </style>
 </head>
 <body class="h-screen w-screen">
-
-    <!-- ==================== ADMIN UI ==================== -->
+    <!-- ADMIN UI -->
     <div id="admin-app" class="hidden p-8 max-w-5xl mx-auto">
-        
         <!-- Login Screen -->
         <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-95 backdrop-blur-sm">
             <div class="bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-2xl w-96 text-center">
                 <h1 class="text-2xl font-bold text-white mb-2">🔐 Master Key</h1>
                 <p class="text-gray-400 text-sm mb-6">Enter your session password.</p>
-                <input type="password" id="master-key-input" placeholder="Enter Key..." class="w-full bg-gray-900 border border-gray-600 text-white rounded px-4 py-2 mb-4 focus:border-purple-500 outli[...]">
+                <input type="password" id="master-key-input" placeholder="Enter Key..." class="w-full bg-gray-900 border border-gray-600 text-white rounded px-4 py-2 mb-4 focus:border-purple-500 outline-none">
                 <button id="btn-login" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded transition">Access Dashboard</button>
                 <p id="login-error" class="text-red-500 text-xs mt-3 hidden">Incorrect key.</p>
             </div>
         </div>
-
         <!-- Dashboard -->
         <div id="dashboard" class="hidden space-y-8">
             <div class="flex justify-between items-center border-b border-gray-700 pb-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-white tracking-tight">
-                        Salamander<span class="text-purple-500">Bot</span> Admin 
-                        <span class="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded ml-2">v1.7</span>
-                    </h1>
+                    <h1 class="text-3xl font-bold text-white tracking-tight">Salamander<span class="text-purple-500">Bot</span> Admin <span class="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded ml-2">v1.7</span></h1>
                     <p class="text-gray-400 text-sm mt-1">Status: <span id="admin-status" class="text-yellow-500 font-mono">Connecting...</span></p>
                 </div>
                 <button id="btn-logout" class="text-xs text-gray-500 hover:text-white underline">Lock Session</button>
             </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Config Column -->
                 <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 h-fit">
                     <h2 class="text-xl font-semibold mb-4 text-purple-400">⚙️ Configuration</h2>
                     <div class="space-y-4">
@@ -98,15 +64,13 @@
                         </div>
                         <div>
                             <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Winners</label>
-                            <input type="number" id="cfg-winners" value="2" min="1" max="100" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-purple-500 outline[...]">
+                            <input type="number" id="cfg-winners" value="2" min="1" max="100" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-purple-500 outline-none">
                         </div>
                         <div class="pt-4 border-t border-gray-700 flex flex-col gap-2">
                             <button id="btn-save" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm transition">Save & Connect</button>
-                            <button id="btn-reset-config" class="w-full bg-red-900/20 hover:bg-red-900/50 text-red-400 border border-red-900/50 hover:border-red-500 font-bold py-2 rounded text-sm tran[...]">Reset</button>
+                            <button id="btn-reset-config" class="w-full bg-red-900/20 hover:bg-red-900/50 text-red-400 border border-red-900/50 hover:border-red-500 font-bold py-2 rounded text-sm">Reset</button>
                         </div>
                     </div>
-
-                    <!-- OBS Link -->
                     <div class="mt-8 pt-6 border-t border-gray-700">
                         <h3 class="text-sm font-bold text-gray-300 mb-2">OBS Overlay URL</h3>
                         <div class="relative group">
@@ -116,8 +80,6 @@
                         <p class="text-xs text-gray-500 mt-2">Add as Browser Source (1920x1080).</p>
                     </div>
                 </div>
-
-                <!-- Participants Column -->
                 <div class="lg:col-span-2 bg-gray-800 rounded-xl p-6 border border-gray-700 flex flex-col h-[600px]">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-purple-400">👥 Participants <span id="admin-count" class="bg-gray-700 text-white text-xs px-2 py-1 rounded-full ml-2">0</span></h2>
@@ -132,16 +94,12 @@
                                     <th class="px-4 py-2 font-medium text-right">Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="participant-list">
-                                <!-- Rows injected here -->
-                            </tbody>
+                            <tbody id="participant-list"></tbody>
                         </table>
-                        <div id="empty-state" class="text-center text-gray-500 py-20 italic">
-                            Waiting for '!sorsolás'...
-                        </div>
+                        <div id="empty-state" class="text-center text-gray-500 py-20 italic">Waiting for '!sorsolás'...</div>
                     </div>
                     <div class="mt-4 bg-gray-700/50 p-3 rounded text-xs text-gray-400 border border-gray-600">
-                        <span class="font-bold text-white">Mod Guide:</span> 
+                        <span class="font-bold text-white">Mod Guide:</span>
                         <code class="text-green-400 ml-1">!sorsolás</code> to join.
                         <span class="text-red-400 ml-1">Ban/Timeout</span> to remove.
                         <code class="text-yellow-400 ml-1">!gaclose</code> to draw.
@@ -150,15 +108,10 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Admin Toast -->
         <div id="admin-toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl border border-gray-600 hidden z-50 transition-all"></div>
     </div>
-
-    <!-- ==================== OVERLAY UI ==================== -->
+    <!-- OVERLAY UI -->
     <div id="overlay-app" class="hidden h-full w-full relative">
-        
-        <!-- Status Panel -->
         <div class="absolute top-10 right-10 bg-black/60 px-5 py-3 rounded-xl border border-white/10 backdrop-blur-md shadow-2xl transition-all duration-300">
             <div class="flex items-center gap-3">
                 <div id="status-dot" class="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.6)]"></div>
@@ -169,33 +122,15 @@
                 <div id="overlay-count" class="text-purple-400 font-mono text-2xl font-bold leading-none">0</div>
             </div>
         </div>
-
-        <!-- Entry Popups Container (Bottom Left) -->
         <div id="entry-popups" class="absolute bottom-10 left-10 flex flex-col gap-4 items-start w-96 z-20"></div>
-
-        <!-- Winner Container (Centered) -->
         <div id="winner-container" class="absolute inset-0 flex flex-wrap items-center justify-center gap-8 z-30 hidden p-20"></div>
     </div>
-
     <script type="module">
         import { Octokit } from "https://esm.sh/octokit";
-
-        // ================= STATE =================
-        const state = {
-            mode: 'admin',
-            participants: new Set(),
-            isOpen: false,
-            queue: [], // For entry popups
-            isProcessingQueue: false,
-            config: { channel: '', repo: '', token: '', winners: 2 },
-            octokit: null,
-            avatars: {} // Cache avatars
-        };
-
+        const state = { mode: 'admin', participants: new Set(), isOpen: false, queue: [], isProcessingQueue: false, config: { channel: '', repo: '', token: '', winners: 2 }, octokit: null, avatars: {} };
         const els = {
             adminApp: document.getElementById('admin-app'),
             overlayApp: document.getElementById('overlay-app'),
-            // Admin
             cfgChannel: document.getElementById('cfg-channel'),
             cfgRepo: document.getElementById('cfg-repo'),
             cfgToken: document.getElementById('cfg-token'),
@@ -205,454 +140,87 @@
             emptyState: document.getElementById('empty-state'),
             adminStatus: document.getElementById('admin-status'),
             adminToast: document.getElementById('admin-toast'),
-            // OBS Link field (FIXED: added missing reference)
             obsUrlOutput: document.getElementById('obs-url-output'),
-            // Overlay
             overlayCount: document.getElementById('overlay-count'),
             entryPopups: document.getElementById('entry-popups'),
             winnerContainer: document.getElementById('winner-container'),
             statusDot: document.getElementById('status-dot'),
             overlayStatusText: document.getElementById('overlay-status-text'),
         };
-
-        // ================= INIT =================
         function init() {
             const params = new URLSearchParams(window.location.search);
             const payload = params.get('payload');
-
             if (payload) {
-                // OBS Mode
                 state.mode = 'obs';
                 document.body.classList.add('mode-obs');
                 els.overlayApp.classList.remove('hidden');
                 try {
                     const decoded = JSON.parse(atob(payload));
                     state.config = { ...state.config, ...decoded };
-                    if (state.config.channel) {
-                        initComfy();
-                    } else {
-                        els.overlayStatusText.innerText = "No Channel";
-                    }
+                    if (state.config.channel) initComfy(); else els.overlayStatusText.innerText = "No Channel";
                     if (state.config.token) initOctokit();
-                } catch(e) { 
-                    console.error("Config Error", e);
-                    els.overlayStatusText.innerText = "Config Error";
-                }
+                } catch(e) { console.error("Config Error", e); els.overlayStatusText.innerText = "Config Error"; }
             } else {
-                // Admin Mode
                 state.mode = 'admin';
                 document.body.classList.add('mode-admin');
                 els.adminApp.classList.remove('hidden');
                 checkLogin();
             }
         }
-
-        // ================= ADMIN LOGIC =================
         const cipher = (t, k) => k ? t.split('').map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ k.charCodeAt(i % k.length))).join('') : t;
-
-        function checkLogin() {
-            const stored = localStorage.getItem('giveaway_config');
-            if (!stored) return; // Wait for login
+        function checkLogin() { const stored = localStorage.getItem('giveaway_config'); if (!stored) return; }
+        const btnLogin = document.getElementById('btn-login');
+        if (btnLogin) {
+            btnLogin.addEventListener('click', () => {
+                const key = document.getElementById('master-key-input').value;
+                if (!key) return;
+                const stored = localStorage.getItem('giveaway_config');
+                if (stored) {
+                    try { const dec = JSON.parse(cipher(stored, key)); if (dec.check === 'ok') loadDashboard(dec.data); else throw new Error(); } catch(e) { document.getElementById('login-error').classList.remove('hidden'); }
+                } else {
+                    const dummy = { check: 'ok', data: state.config };
+                    localStorage.setItem('giveaway_config', cipher(JSON.stringify(dummy), key));
+                    loadDashboard(dummy.data);
+                }
+            });
         }
-
-        document.getElementById('btn-login').addEventListener('click', () => {
-            const key = document.getElementById('master-key-input').value;
-            if (!key) return;
-            const stored = localStorage.getItem('giveaway_config');
-            
-            if (stored) {
-                try {
-                    const dec = JSON.parse(cipher(stored, key));
-                    if (dec.check === 'ok') loadDashboard(dec.data);
-                    else throw new Error();
-                } catch(e) { document.getElementById('login-error').classList.remove('hidden'); }
-            } else {
-                // First time
-                const dummy = { check: 'ok', data: state.config };
-                localStorage.setItem('giveaway_config', cipher(JSON.stringify(dummy), key));
-                loadDashboard(dummy.data);
-            }
-        });
-
         function loadDashboard(data) {
             state.config = data;
             els.cfgChannel.value = data.channel || '';
             els.cfgRepo.value = data.repo || '';
             els.cfgToken.value = data.token || '';
             els.cfgWinners.value = data.winners || 2;
-
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('dashboard').classList.remove('hidden');
             updateObsUrl();
-            
-            if(state.config.channel) {
-                initComfy();
-            } else {
-                els.adminStatus.innerText = "Setup Required";
-                els.adminStatus.className = "text-gray-500 font-mono";
-            }
+            if (state.config.channel) initComfy(); else { els.adminStatus.innerText = "Setup Required"; els.adminStatus.className = "text-gray-500 font-mono"; }
         }
-
         document.getElementById('btn-save').addEventListener('click', () => {
             const key = document.getElementById('master-key-input').value;
-            
-            // 1. Get Data (NO TRIM as requested)
-            const newConfig = {
-                channel: els.cfgChannel.value,
-                repo: els.cfgRepo.value,
-                token: els.cfgToken.value,
-                winners: parseInt(els.cfgWinners.value) || 2
-            };
-
-            // 2. UI Feedback
-            if(state.mode === 'admin') {
-                els.adminStatus.innerText = "Connecting...";
-                els.adminStatus.className = "text-yellow-500 font-mono";
-            }
-
-            // 3. Save & Connect
+            const newConfig = { channel: els.cfgChannel.value, repo: els.cfgRepo.value, token: els.cfgToken.value, winners: parseInt(els.cfgWinners.value) || 2 };
+            if(state.mode === 'admin') { els.adminStatus.innerText = "Connecting..."; els.adminStatus.className = "text-yellow-500 font-mono"; }
             localStorage.setItem('giveaway_config', cipher(JSON.stringify({check:'ok', data:newConfig}), key));
-            state.config = newConfig;
-            updateObsUrl();
-            
-            initComfy();
-            showAdminToast("Configuration Saved");
+            state.config = newConfig; updateObsUrl(); initComfy(); showAdminToast("Configuration Saved");
         });
-
-        // --- NEW RESET BUTTON LOGIC ---
-        document.getElementById('btn-reset-config').addEventListener('click', () => {
-            if(confirm("⚠ HARD RESET: This will delete your Master Key and all settings from this browser.\n\nYou will need to enter your details again.\n\nContinue?")) {
-                localStorage.removeItem('giveaway_config');
-                location.reload();
-            }
-        });
-
-        document.getElementById('btn-copy').addEventListener('click', () => {
-            els.obsUrlOutput.select();
-            document.execCommand("copy");
-            showAdminToast("OBS Link Copied!");
-        });
-
-        document.getElementById('btn-clear').addEventListener('click', () => {
-            if(confirm("Clear local list? (Obs will keep its list unless you restart it)")) {
-                state.participants.clear();
-                updateUI(null, 'reset');
-            }
-        });
-
-        function updateObsUrl() {
-            const payload = btoa(JSON.stringify(state.config));
-            els.obsUrlOutput.value = `${window.location.protocol}//${window.location.host}${window.location.pathname}?payload=${payload}`;
-        }
-
-        // ================= CHAT LOGIC (CORE) =================
-        function initComfy() {
-            if(!state.config.channel) return;
-
-            // Disconnect if already connected (simple reload approach is safer but we'll try/catch)
-            try { ComfyJS.Disconnect(); } catch(e){}
-
-            ComfyJS.onCommand = handleCommand;
-            
-            // Auto-Remove Logic
-            ComfyJS.onBan = (channel, username) => silentRemove(username);
-            ComfyJS.onTimeout = (channel, username, duration, message) => silentRemove(username);
-
-            ComfyJS.onConnected = () => {
-                state.isOpen = true;
-                if(state.mode === 'admin') {
-                    els.adminStatus.innerText = "Connected to " + state.config.channel;
-                    els.adminStatus.classList.remove('text-yellow-500', 'text-red-500');
-                    els.adminStatus.classList.add('text-green-500');
-                } else {
-                    els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]";
-                    els.overlayStatusText.innerText = "Listening";
-                }
-            };
-            
-            ComfyJS.onConnectionError = () => {
-                if(state.mode === 'admin') els.adminStatus.innerText = "Error Connecting";
-            };
-
-            ComfyJS.Init(state.config.channel);
-        }
-
-        function silentRemove(username) {
-            const target = username.toLowerCase();
-            for (let p of state.participants) {
-                if (p.toLowerCase() === target) {
-                    state.participants.delete(p);
-                    updateUI(p, 'remove');
-                }
-            }
-        }
-
-        function handleCommand(user, command, message, flags, extra) {
-            const cmd = command.toLowerCase();
-
-            // --- JOIN ---
-            // Allows both !sorsolás and !sorsolas
-            if ((cmd === 'sorsolás' || cmd === 'sorsolas') && state.isOpen) {
-                if (!state.participants.has(user)) {
-                    state.participants.add(user);
-                    updateUI(user, 'add');
-                    if (state.mode === 'obs') addToQueue(user);
-                }
-            }
-
-            // --- REMOVE (Manual Command Backup) ---
-            if (cmd === 'garemove' && (flags.mod || flags.broadcaster)) {
-                const target = message.trim();
-                if (target) silentRemove(target);
-            }
-
-            // --- CLOSE ---
-            if (cmd === 'gaclose' && (flags.mod || flags.broadcaster)) {
-                runDraw();
-            }
-            
-            // --- RESET ---
-            if (cmd === 'gareset' && (flags.mod || flags.broadcaster)) {
-                resetGiveaway();
-            }
-        }
-
-        function resetGiveaway() {
-            state.participants.clear();
-            state.isOpen = true;
-            updateUI(null, 'reset');
-            
-            if (state.mode === 'obs') {
-                els.winnerContainer.innerHTML = '';
-                els.winnerContainer.classList.add('hidden');
-                els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]";
-                els.overlayStatusText.innerText = "Listening";
-            } else {
-                showAdminToast("Round Reset! Ready for new entries.");
-            }
-        }
-
-        // ================= UI UPDATES =================
-        function updateUI(user, action) {
-            // OBS
-            if (state.mode === 'obs') {
-                if (action === 'reset') {
-                    els.overlayCount.innerText = '0';
-                    return;
-                }
-                els.overlayCount.innerText = state.participants.size;
-                if (action === 'add') {
-                    els.overlayCount.classList.add('scale-125', 'text-green-400');
-                    setTimeout(() => els.overlayCount.classList.remove('scale-125', 'text-green-400'), 200);
-                }
-            }
-
-            // ADMIN
-            if (state.mode === 'admin') {
-                if (action === 'reset') {
-                     els.adminCount.innerText = '0';
-                     els.participantList.innerHTML = '';
-                     els.emptyState.classList.remove('hidden');
-                     return;
-                }
-                els.adminCount.innerText = state.participants.size;
-                
-                if (action === 'add') {
-                    els.emptyState.classList.add('hidden');
-                    const row = document.createElement('tr');
-                    row.id = `row-${user}`;
-                    row.className = "admin-table-row border-b border-gray-700 hover:bg-white/5 transition";
-                    row.innerHTML = `
-                        <td class="px-4 py-2 font-mono text-purple-300">${user}</td>
-                        <td class="px-4 py-2 text-xs text-gray-500">${new Date().toLocaleTimeString()}</td>
-                        <td class="px-4 py-2 text-right">
-                            <button onclick="window.removeUser('${user}')" class="text-gray-500 hover:text-red-400 transition" title="Copy remove command">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 [...]"></path>
-                                </svg>
-                            </button>
-                        </td>
-                    `;
-                    els.participantList.prepend(row);
-                } 
-                else if (action === 'remove') {
-                    const row = document.getElementById(`row-${user}`);
-                    if (row) row.remove();
-                    if (state.participants.size === 0) els.emptyState.classList.remove('hidden');
-                }
-            }
-        }
-
-        // Exposed to global scope for the button onclick
-        window.removeUser = (user) => {
-            const cmd = `!garemove ${user}`;
-            navigator.clipboard.writeText(cmd).then(() => {
-                showAdminToast(`Copied: "${cmd}" - Paste in Chat!`);
-            });
-        };
-
-        function showAdminToast(msg) {
-            els.adminToast.innerText = msg;
-            els.adminToast.classList.remove('hidden', 'fade-out-down');
-            els.adminToast.classList.add('fade-in-up');
-            setTimeout(() => {
-                els.adminToast.classList.remove('fade-in-up');
-                els.adminToast.classList.add('fade-out-down');
-            }, 3000);
-        }
-
-        // ================= DRAW LOGIC =================
-        async function runDraw() {
-            if (!state.isOpen) return;
-            state.isOpen = false;
-
-            // OBS logic (The Source of Truth)
-            if (state.mode === 'obs') {
-                els.statusDot.className = "w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.6)]";
-                els.overlayStatusText.innerText = "Drawing...";
-                
-                const userList = Array.from(state.participants);
-                const count = state.config.winners || 2;
-
-                if (userList.length < 1) return; // Silent fail if empty
-
-                // RNG
-                const winners = [];
-                // Safe loop
-                const loopMax = Math.min(count, userList.length);
-                while (winners.length < loopMax) {
-                    const r = Math.floor(Math.random() * userList.length);
-                    const w = userList[r];
-                    if (!winners.includes(w)) winners.push(w);
-                }
-
-                // Render Winners
-                els.winnerContainer.innerHTML = '';
-                els.winnerContainer.classList.remove('hidden');
-                for (const w of winners) {
-                    await renderWinnerCard(w);
-                }
-                
-                // Confetti
-                launchConfetti();
-
-                // GitHub Upload
-                if (state.config.token) uploadResults(userList, winners);
-            } 
-            else {
-                // Admin Logic (Passive)
-                els.adminStatus.innerText = "Draw Triggered (See Stream)";
-                els.adminStatus.className = "text-purple-400 font-bold";
-                showAdminToast("Giveaway Closed! Results on Stream.");
-            }
-        }
-
-        // ================= VISUALS (OVERLAY) =================
-        
-        // --- Avatar Cache ---
-        async function getAvatar(username) {
-            if (state.avatars[username]) return state.avatars[username];
-            let url = "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-300x300.png";
-            try {
-                const res = await fetch(`https://decapi.me/twitch/avatar/${username}`);
-                const text = await res.text();
-                if (text && text.startsWith('http')) url = text;
-            } catch(e) {}
-            state.avatars[username] = url;
-            return url;
-        }
-
-        // --- Entry Popups ---
-        function addToQueue(user) {
-            state.queue.push(user);
-            processQueue();
-        }
-
-        async function processQueue() {
-            if (state.isProcessingQueue || state.queue.length === 0) return;
-            state.isProcessingQueue = true;
-
-            const user = state.queue.shift();
-            const avatar = await getAvatar(user);
-
-            // Create Popup Element
-            const div = document.createElement('div');
-            div.className = "entry-popup flex items-center gap-4 p-4 rounded-r-lg shadow-lg text-white mb-3 slide-in-right w-80";
-            div.innerHTML = `
-                <img src="${avatar}" class="w-12 h-12 rounded-full border-2 border-green-400 object-cover">
-                <div>
-                    <div class="font-bold text-lg leading-tight">${user}</div>
-                    <div class="text-xs text-green-300 uppercase tracking-wide">belépett a sorsolásba</div>
-                </div>
-            `;
-            els.entryPopups.appendChild(div);
-
-            // Remove after 3s
-            setTimeout(() => {
-                div.classList.add('fade-out-down');
-                setTimeout(() => div.remove(), 500);
-            }, 3000);
-
-            // Wait 1.5s before showing next (prevents spam overlap)
-            setTimeout(() => {
-                state.isProcessingQueue = false;
-                processQueue();
-            }, 1500);
-        }
-
-        // --- Winner Cards ---
-        async function renderWinnerCard(username) {
-            const avatar = await getAvatar(username);
-            const card = document.createElement('div');
-            card.className = "winner-card p-6 rounded-xl flex flex-col items-center w-64 fade-in-up transform scale-95";
-            card.innerHTML = `
-                <div class="relative">
-                    <img src="${avatar}" class="w-24 h-24 rounded-full border-4 border-purple-500 mb-4 object-cover shadow-lg">
-                    <div class="absolute -bottom-2 -right-2 bg-yellow-400 text-black font-bold px-2 py-1 rounded text-xs shadow-md">WINNER</div>
-                </div>
-                <h2 class="text-2xl font-bold text-white mb-1 truncate w-full text-center">${username}</h2>
-                <p class="text-purple-300 text-sm">Gratulálok!</p>
-            `;
-            els.winnerContainer.appendChild(card);
-            // Stagger animation slightly
-            await new Promise(r => setTimeout(r, 200)); 
-            card.classList.remove('scale-95');
-            card.classList.add('scale-100');
-        }
-
-        function launchConfetti() {
-            const end = Date.now() + 5000;
-            (function frame() {
-                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#a855f7', '#34d399'] });
-                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#a855f7', '#34d399'] });
-                if (Date.now() < end) requestAnimationFrame(frame);
-            }());
-        }
-
-        // --- GitHub ---
-        function initOctokit() {
-            try { state.octokit = new Octokit({ auth: state.config.token }); } catch(e){}
-        }
-
-        async function uploadResults(participants, winners) {
-            if (!state.octokit || !state.config.repo) return;
-            try {
-                els.overlayStatusText.innerText = "Saving...";
-                const date = new Date().toISOString().replace(/[:.]/g, '-');
-                const [owner, repoName] = state.config.repo.split('/');
-                const content = `WINNERS:\n${winners.join('\n')}\n\nTOTAL: ${participants.length}\n${participants.join('\n')}`;
-                
-                await state.octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
-                    owner, repo: repoName,
-                    path: `giveaways/${date}.txt`,
-                    message: `Giveaway ${date}`,
-                    content: btoa(unescape(encodeURIComponent(content)))
-                });
-                els.overlayStatusText.innerText = "Saved";
-                els.statusDot.className = "w-3 h-3 rounded-full bg-blue-500";
-            } catch(e) { console.error(e); }
-        }
-
+        document.getElementById('btn-reset-config').addEventListener('click', () => { if(confirm("⚠ HARD RESET: This will delete your Master Key and all settings from this browser.\n\nYou will need to enter your details again.\n\nContinue?")) { localStorage.removeItem('giveaway_config'); location.reload(); } });
+        document.getElementById('btn-copy').addEventListener('click', () => { if (els.obsUrlOutput) { els.obsUrlOutput.select(); document.execCommand("copy"); showAdminToast("OBS Link Copied!"); } });
+        document.getElementById('btn-clear').addEventListener('click', () => { if(confirm("Clear local list? (Obs will keep its list unless you restart it)")) { state.participants.clear(); updateUI(null, 'reset'); } });
+        function updateObsUrl() { const payload = btoa(JSON.stringify(state.config)); if (els.obsUrlOutput) els.obsUrlOutput.value = `${window.location.protocol}//${window.location.host}${window.location.pathname}?payload=${payload}`; }
+        function initComfy() { if(!state.config.channel) return; try { ComfyJS.Disconnect(); } catch(e){}; ComfyJS.onCommand = handleCommand; ComfyJS.onBan = (channel, username) => silentRemove(username); ComfyJS.onTimeout = (channel, username, duration, message) => silentRemove(username); ComfyJS.onConnected = () => { state.isOpen = true; if(state.mode === 'admin') { els.adminStatus.innerText = "Connected to " + state.config.channel; els.adminStatus.classList.remove('text-yellow-500', 'text-red-500'); els.adminStatus.classList.add('text-green-500'); } else { els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]"; els.overlayStatusText.innerText = "Listening"; } }; ComfyJS.onConnectionError = () => { if(state.mode === 'admin') els.adminStatus.innerText = "Error Connecting"; }; ComfyJS.Init(state.config.channel); }
+        function silentRemove(username) { const target = username.toLowerCase(); for (let p of state.participants) { if (p.toLowerCase() === target) { state.participants.delete(p); updateUI(p, 'remove'); } } }
+        function handleCommand(user, command, message, flags, extra) { const cmd = command.toLowerCase(); if ((cmd === 'sorsolás' || cmd === 'sorsolas') && state.isOpen) { if (!state.participants.has(user)) { state.participants.add(user); updateUI(user, 'add'); if (state.mode === 'obs') addToQueue(user); } } if (cmd === 'garemove' && (flags.mod || flags.broadcaster)) { const target = message.trim(); if (target) silentRemove(target); } if (cmd === 'gaclose' && (flags.mod || flags.broadcaster)) { runDraw(); } if (cmd === 'gareset' && (flags.mod || flags.broadcaster)) { resetGiveaway(); } }
+        function resetGiveaway() { state.participants.clear(); state.isOpen = true; updateUI(null, 'reset'); if (state.mode === 'obs') { els.winnerContainer.innerHTML = ''; els.winnerContainer.classList.add('hidden'); els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]"; els.overlayStatusText.innerText = "Listening"; } else { showAdminToast("Round Reset! Ready for new entries."); } }
+        function updateUI(user, action) { if (state.mode === 'obs') { if (action === 'reset') { els.overlayCount.innerText = '0'; return; } els.overlayCount.innerText = state.participants.size; if (action === 'add') { els.overlayCount.classList.add('scale-125', 'text-green-400'); setTimeout(() => els.overlayCount.classList.remove('scale-125', 'text-green-400'), 200); } } if (state.mode === 'admin') { if (action === 'reset') { els.adminCount.innerText = '0'; els.participantList.innerHTML = ''; els.emptyState.classList.remove('hidden'); return; } els.adminCount.innerText = state.participants.size; if (action === 'add') { els.emptyState.classList.add('hidden'); const row = document.createElement('tr'); row.id = `row-${user}`; row.className = "admin-table-row border-b border-gray-700 hover:bg-white/5 transition"; row.innerHTML = `<td class="px-4 py-2 font-mono text-purple-300">${user}</td><td class="px-4 py-2 text-xs text-gray-500">${new Date().toLocaleTimeString()}</td><td class="px-4 py-2 text-right"><button onclick="window.removeUser('${user}')" class="text-gray-500 hover:text-red-400 transition" title="Copy remove command">Remove</button></td>`; els.participantList.prepend(row); } else if (action === 'remove') { const row = document.getElementById(`row-${user}`); if (row) row.remove(); if (state.participants.size === 0) els.emptyState.classList.remove('hidden'); } } }
+        window.removeUser = (user) => { const cmd = `!garemove ${user}`; navigator.clipboard.writeText(cmd).then(() => { showAdminToast(`Copied: "${cmd}" - Paste in Chat!`); }); };
+        function showAdminToast(msg) { els.adminToast.innerText = msg; els.adminToast.classList.remove('hidden', 'fade-out-down'); els.adminToast.classList.add('fade-in-up'); setTimeout(() => { els.adminToast.classList.remove('fade-in-up'); els.adminToast.classList.add('fade-out-down'); }, 3000); }
+        async function runDraw() { if (!state.isOpen) return; state.isOpen = false; if (state.mode === 'obs') { els.statusDot.className = "w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.6)]"; els.overlayStatusText.innerText = "Drawing..."; const userList = Array.from(state.participants); const count = state.config.winners || 2; if (userList.length < 1) return; const winners = []; const loopMax = Math.min(count, userList.length); while (winners.length < loopMax) { const r = Math.floor(Math.random() * userList.length); const w = userList[r]; if (!winners.includes(w)) winners.push(w); } els.winnerContainer.innerHTML = ''; els.winnerContainer.classList.remove('hidden'); for (const w of winners) { await renderWinnerCard(w); } launchConfetti(); if (state.config.token) uploadResults(userList, winners); } else { els.adminStatus.innerText = "Draw Triggered (See Stream)"; els.adminStatus.className = "text-purple-400 font-bold"; showAdminToast("Giveaway Closed! Results on Stream."); } }
+        async function getAvatar(username) { if (state.avatars[username]) return state.avatars[username]; let url = "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-300x300.png"; try { const res = await fetch(`https://decapi.me/twitch/avatar/${username}`); const text = await res.text(); if (text && text.startsWith('http')) url = text; } catch(e) {} state.avatars[username] = url; return url; }
+        function addToQueue(user) { state.queue.push(user); processQueue(); }
+        async function processQueue() { if (state.isProcessingQueue || state.queue.length === 0) return; state.isProcessingQueue = true; const user = state.queue.shift(); const avatar = await getAvatar(user); const div = document.createElement('div'); div.className = "entry-popup flex items-center gap-4 p-4 rounded-r-lg shadow-lg text-white mb-3 slide-in-right w-80"; div.innerHTML = `<img src="${avatar}" class="w-12 h-12 rounded-full border-2 border-green-400 object-cover"><div><div class="font-bold text-lg leading-tight">${user}</div><div class="text-xs text-green-300 uppercase tracking-wide">belépett a sorsolásba</div></div>`; els.entryPopups.appendChild(div); setTimeout(() => { div.classList.add('fade-out-down'); setTimeout(() => div.remove(), 500); }, 3000); setTimeout(() => { state.isProcessingQueue = false; processQueue(); }, 1500); }
+        async function renderWinnerCard(username) { const avatar = await getAvatar(username); const card = document.createElement('div'); card.className = "winner-card p-6 rounded-xl flex flex-col items-center w-64 fade-in-up transform scale-95"; card.innerHTML = `<div class="relative"><img src="${avatar}" class="w-24 h-24 rounded-full border-4 border-purple-500 mb-4 object-cover shadow-lg"><div class="absolute -bottom-2 -right-2 bg-yellow-400 text-black font-bold px-2 py-1 rounded text-xs shadow-md">WINNER</div></div><h2 class="text-2xl font-bold text-white mb-1 truncate w-full text-center">${username}</h2><p class="text-purple-300 text-sm">Gratulálok!</p>`; els.winnerContainer.appendChild(card); await new Promise(r => setTimeout(r, 200)); card.classList.remove('scale-95'); card.classList.add('scale-100'); }
+        function launchConfetti() { const end = Date.now() + 5000; (function frame() { confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#a855f7', '#34d399'] }); confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#a855f7', '#34d399'] }); if (Date.now() < end) requestAnimationFrame(frame); }()); }
+        function initOctokit() { try { state.octokit = new Octokit({ auth: state.config.token }); } catch(e){} }
+        async function uploadResults(participants, winners) { if (!state.octokit || !state.config.repo) return; try { els.overlayStatusText.innerText = "Saving..."; const date = new Date().toISOString().replace(/[:.]/g, '-'); const [owner, repoName] = state.config.repo.split('/'); const content = `WINNERS:\n${winners.join('\n')}\n\nTOTAL: ${participants.length}\n${participants.join('\n')}`; await state.octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', { owner, repo: repoName, path: `giveaways/${date}.txt`, message: `Giveaway ${date}`, content: btoa(unescape(encodeURIComponent(content))) }); els.overlayStatusText.innerText = "Saved"; els.statusDot.className = "w-3 h-3 rounded-full bg-blue-500"; } catch(e) { console.error(e); } }
         init();
     </script>
 </body>
