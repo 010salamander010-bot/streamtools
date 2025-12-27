@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SalamanderBot Giveaway v1.3</title>
+    <title>SalamanderBot Giveaway v1.4</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -72,7 +72,7 @@
                 <div>
                     <h1 class="text-3xl font-bold text-white tracking-tight">
                         Salamander<span class="text-purple-500">Bot</span> Admin 
-                        <span class="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded ml-2">v1.3</span>
+                        <span class="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded ml-2">v1.4</span>
                     </h1>
                     <p class="text-gray-400 text-sm mt-1">Status: <span id="admin-status" class="text-yellow-500 font-mono">Connecting...</span></p>
                 </div>
@@ -293,24 +293,33 @@
 
         document.getElementById('btn-save').addEventListener('click', () => {
             const key = document.getElementById('master-key-input').value;
-            const newConfig = {
-                channel: els.cfgChannel.value,
-                repo: els.cfgRepo.value,
-                token: els.cfgToken.value,
-                winners: parseInt(els.cfgWinners.value)
-            };
             
-            // Immediate Feedback
+            // 1. Get & Clean Data
+            const newConfig = {
+                channel: els.cfgChannel.value.trim(),
+                repo: els.cfgRepo.value.trim(),
+                token: els.cfgToken.value.trim(),
+                winners: parseInt(els.cfgWinners.value) || 2
+            };
+
+            // 2. Validate
+            if(!newConfig.channel) {
+                alert("Twitch Channel is required!");
+                return; 
+            }
+
+            // 3. UI Feedback
             if(state.mode === 'admin') {
-                els.adminStatus.innerText = "Saving...";
+                els.adminStatus.innerText = "Connecting...";
                 els.adminStatus.className = "text-yellow-500 font-mono";
             }
 
+            // 4. Save & Connect
             localStorage.setItem('giveaway_config', cipher(JSON.stringify({check:'ok', data:newConfig}), key));
             state.config = newConfig;
             updateObsUrl();
             
-            if(state.config.channel) initComfy();
+            initComfy();
             showAdminToast("Configuration Saved");
         });
 
@@ -343,15 +352,9 @@
         // ================= CHAT LOGIC (CORE) =================
         function initComfy() {
             if(!state.config.channel) return;
-            const target = state.config.channel.trim();
+            const target = state.config.channel; // Already trimmed
 
-            // Visual feedback immediately for Admin
-            if(state.mode === 'admin') {
-                els.adminStatus.innerText = "Disconnecting...";
-                els.adminStatus.className = "text-yellow-500 font-mono";
-            }
-
-            // Force disconnect
+            // Force disconnect to ensure clean state
             try { ComfyJS.Disconnect(); } catch(e) { }
 
             // Re-bind to ensure clean state
@@ -379,11 +382,8 @@
                  }
             };
 
-            // Small delay to ensure disconnect happened
-            setTimeout(() => {
-                if(state.mode === 'admin') els.adminStatus.innerText = "Connecting...";
-                ComfyJS.Init(target);
-            }, 100);
+            // Init
+            ComfyJS.Init(target);
         }
 
         function silentRemove(username) {
