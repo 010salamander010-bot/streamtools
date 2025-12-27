@@ -60,7 +60,7 @@
             <div class="bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-2xl w-96 text-center">
                 <h1 class="text-2xl font-bold text-white mb-2">🔐 Master Key</h1>
                 <p class="text-gray-400 text-sm mb-6">Enter your session password.</p>
-                <input type="password" id="master-key-input" placeholder="Enter Key..." class="w-full bg-gray-900 border border-gray-600 text-white rounded px-4 py-2 mb-4 focus:border-purple-500 outline-none transition">
+                <input type="password" id="master-key-input" placeholder="Enter Key..." class="w-full bg-gray-900 border border-gray-600 text-white rounded px-4 py-2 mb-4 focus:border-purple-500 outli[...]
                 <button id="btn-login" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded transition">Access Dashboard</button>
                 <p id="login-error" class="text-red-500 text-xs mt-3 hidden">Incorrect key.</p>
             </div>
@@ -98,11 +98,11 @@
                         </div>
                         <div>
                             <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Winners</label>
-                            <input type="number" id="cfg-winners" value="2" min="1" max="100" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-purple-500 outline-none">
+                            <input type="number" id="cfg-winners" value="2" min="1" max="100" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-purple-500 outline[...]
                         </div>
                         <div class="pt-4 border-t border-gray-700 flex flex-col gap-2">
                             <button id="btn-save" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm transition">Save & Connect</button>
-                            <button id="btn-reset-config" class="w-full bg-red-900/20 hover:bg-red-900/50 text-red-400 border border-red-900/50 hover:border-red-500 font-bold py-2 rounded text-sm transition">Reset / Wipe Data</button>
+                            <button id="btn-reset-config" class="w-full bg-red-900/20 hover:bg-red-900/50 text-red-400 border border-red-900/50 hover:border-red-500 font-bold py-2 rounded text-sm tran[...]
                         </div>
                     </div>
 
@@ -110,7 +110,7 @@
                     <div class="mt-8 pt-6 border-t border-gray-700">
                         <h3 class="text-sm font-bold text-gray-300 mb-2">OBS Overlay URL</h3>
                         <div class="relative group">
-                            <input type="text" id="obs-url-output" readonly class="w-full bg-black border border-gray-600 text-gray-400 rounded px-3 py-2 text-xs font-mono truncate cursor-pointer" value="Configure to generate link...">
+                            <input type="text" id="obs-url-output" readonly class="w-full bg-black border border-gray-600 text-gray-400 rounded px-3 py-2 text-xs font-mono truncate cursor-pointer" val[...]
                             <button id="btn-copy" class="absolute right-1 top-1 bg-gray-700 hover:bg-gray-600 text-xs px-2 py-1 rounded">Copy</button>
                         </div>
                         <p class="text-xs text-gray-500 mt-2">Add as Browser Source (1920x1080).</p>
@@ -152,7 +152,7 @@
         </div>
         
         <!-- Admin Toast -->
-        <div id="admin-toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl border border-gray-600 hidden z-50 transition-all"></div>
+        <div id="admin-toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl border border-gray-600 hidden z-50 transition-all"></div>[...]
     </div>
 
     <!-- ==================== OVERLAY UI ==================== -->
@@ -205,6 +205,8 @@
             emptyState: document.getElementById('empty-state'),
             adminStatus: document.getElementById('admin-status'),
             adminToast: document.getElementById('admin-toast'),
+            // OBS Link field (FIXED: added missing reference)
+            obsUrlOutput: document.getElementById('obs-url-output'),
             // Overlay
             overlayCount: document.getElementById('overlay-count'),
             entryPopups: document.getElementById('entry-popups'),
@@ -466,7 +468,7 @@
                         <td class="px-4 py-2 text-right">
                             <button onclick="window.removeUser('${user}')" class="text-gray-500 hover:text-red-400 transition" title="Copy remove command">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 [...]
                                 </svg>
                             </button>
                         </td>
