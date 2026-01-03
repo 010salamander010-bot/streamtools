@@ -191,6 +191,11 @@
     <div id="ui-trigger" class="absolute inset-0 z-0 hidden"></div>
 
     <script>
+        // --- Security Check for Local Files ---
+        if (window.location.protocol === 'file:') {
+            alert("⚠️ Browser Security Warning ⚠️\n\nMicrophone access is blocked when opening files directly from your computer (file://).\n\nTo use this WebTuber:\n1. Upload this file to GitHub Pages (Recommended)\n2. OR Run it on a local server (localhost)");
+        }
+
         // --- Configuration ---
         const state = {
             audioContext: null,
@@ -244,7 +249,12 @@
                 // Start Loop
                 animate();
             } catch (err) {
-                alert("Microphone denied. Please check browser permissions.");
+                console.error(err);
+                if (window.location.protocol === 'file:') {
+                    alert("Error: Microphone access denied. This is likely because you are running the file locally (file://). Please upload to a server.");
+                } else {
+                    alert("Microphone denied. Please check browser permissions in the URL bar.");
+                }
             }
         });
 
