@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v2.0</title>
+    <title>Salamander WebTuber v2.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { 
@@ -26,12 +26,10 @@
             display: flex;
             justify-content: center;
             align-items: flex-end;
-            /* Physics Transition (Fast for bounce) */
             transition: transform 0.05s linear; 
             pointer-events: none; 
         }
 
-        /* The Avatar Image */
         #avatar-img {
             max-width: 100%;
             max-height: 100%;
@@ -44,12 +42,12 @@
             position: absolute;
             top: 10px;
             left: 10px;
-            background: rgba(17, 24, 39, 0.9);
+            background: rgba(17, 24, 39, 0.95);
             padding: 20px;
             border-radius: 12px;
             color: white;
             font-family: 'Segoe UI', sans-serif;
-            width: 340px;
+            width: 360px;
             max-height: 90vh;
             overflow-y: auto;
             z-index: 100;
@@ -58,7 +56,6 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
         }
 
-        /* Custom Scrollbar */
         #controls::-webkit-scrollbar { width: 8px; }
         #controls::-webkit-scrollbar-track { background: #1f2937; }
         #controls::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
@@ -70,18 +67,55 @@
         input[type="range"] { width: 100%; accent-color: #a855f7; height: 6px; background: #374151; border-radius: 5px; appearance: none; }
         input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #a855f7; border-radius: 50%; cursor: pointer; }
         
+        /* File Upload Styling */
         .file-upload {
             border: 2px dashed #4b5563;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
             cursor: pointer;
             margin-bottom: 5px;
             border-radius: 8px;
             transition: all 0.2s;
             background: rgba(255,255,255,0.02);
+            position: relative;
+            overflow: hidden;
         }
         .file-upload:hover { border-color: #a855f7; background: rgba(168, 85, 247, 0.1); color: #e9d5ff; }
+
+        /* Thumbnails Strip */
+        .thumb-strip {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            margin-top: 5px;
+            padding-bottom: 5px;
+            min-height: 30px;
+        }
+        .thumb-strip img {
+            width: 30px;
+            height: 30px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #4b5563;
+        }
+        .thumb-slot {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.2);
+            padding: 5px;
+            border-radius: 6px;
+            margin-bottom: 5px;
+        }
+        .thumb-preview {
+            width: 40px;
+            height: 40px;
+            background: #1f2937;
+            border-radius: 4px;
+            object-fit: contain;
+            border: 1px solid #374151;
+        }
 
         #hide-ui {
             position: absolute;
@@ -97,101 +131,169 @@
         #hide-ui:hover { color: white; }
 
         .hidden { display: none !important; }
+        
+        select {
+            background-color: #374151;
+            color: white;
+            border: 1px solid #4b5563;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            font-size: 12px;
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #9ca3af;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: #a855f7;
+            color: white;
+            border-color: #a855f7;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Avatar Stage -->
     <div id="avatar-container">
-        <!-- Default Placeholder -->
         <img id="avatar-img" src="https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png">
     </div>
 
-    <!-- UI Panel -->
     <div id="controls">
         <button id="hide-ui" title="Hide Controls">✕</button>
         
-        <h1 class="text-xl font-bold mb-1 text-white">Web<span class="text-purple-500">Tuber</span> <span class="text-xs font-normal text-gray-500 ml-1">v2.1</span></h1>
-        <p class="text-xs text-gray-400 mb-4">Frame-based Animation Engine</p>
-
+        <h1 class="text-xl font-bold mb-1 text-white">Web<span class="text-purple-500">Tuber</span> <span class="text-xs font-normal text-gray-500 ml-1">v2.3</span></h1>
+        
         <div class="control-group">
             <button id="btn-start" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded transition shadow-lg shadow-purple-900/50">🎤 Activate Mic</button>
         </div>
 
-        <div class="control-group">
-            <label>1. Idle Animation</label>
-            <div class="file-upload" onclick="document.getElementById('input-idle').click()">
-                <span id="label-idle">📁 Upload Frames (Select Multiple)</span>
+        <!-- Mode Switcher -->
+        <div class="flex rounded-lg overflow-hidden mb-4 border border-gray-700">
+            <button class="tab-btn active" onclick="switchMode('simple')">Simple (Images)</button>
+            <button class="tab-btn" onclick="switchMode('advanced')">Advanced (Frames)</button>
+        </div>
+
+        <!-- SIMPLE MODE UI -->
+        <div id="ui-simple">
+            <div class="control-group">
+                <label>Idle State (Quiet)</label>
+                <!-- Idle Slot 1 -->
+                <div class="thumb-slot" onclick="document.getElementById('simple-idle-1').click()">
+                    <img id="prev-idle-1" class="thumb-preview" src="https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png">
+                    <div class="flex-1 cursor-pointer">
+                        <div class="text-xs font-bold text-gray-300">1. Eyes Open (Main)</div>
+                        <div class="text-[10px] text-gray-500">Click to upload</div>
+                    </div>
+                </div>
+                <input type="file" id="simple-idle-1" class="hidden" accept="image/*">
+
+                <!-- Idle Slot 2 -->
+                <div class="thumb-slot" onclick="document.getElementById('simple-idle-2').click()">
+                    <img id="prev-idle-2" class="thumb-preview" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiPjwvc3ZnPg==" style="opacity:0.3">
+                    <div class="flex-1 cursor-pointer">
+                        <div class="text-xs font-bold text-gray-300">2. Eyes Closed (Blink)</div>
+                        <div class="text-[10px] text-gray-500">Optional - Enables blinking</div>
+                    </div>
+                    <button class="text-xs text-red-400 px-2" onclick="event.stopPropagation(); clearSlot('idle', 2)">✕</button>
+                </div>
+                <input type="file" id="simple-idle-2" class="hidden" accept="image/*">
             </div>
-            <input type="file" id="input-idle" class="hidden" multiple accept="image/*">
-            <div class="text-[10px] text-gray-500 mt-1">Order based on filename (01.png, 02.png...)</div>
+
+            <div class="control-group">
+                <label>Talking State (Loud)</label>
+                <!-- Talk Slot 1 -->
+                <div class="thumb-slot" onclick="document.getElementById('simple-talk-1').click()">
+                    <img id="prev-talk-1" class="thumb-preview" src="https://cdn3.emoji.gg/emojis/9686-blobcat-hyper.gif">
+                    <div class="flex-1 cursor-pointer">
+                        <div class="text-xs font-bold text-gray-300">1. Mouth Open</div>
+                        <div class="text-[10px] text-gray-500">Main talking image</div>
+                    </div>
+                </div>
+                <input type="file" id="simple-talk-1" class="hidden" accept="image/*">
+
+                <!-- Talk Slot 2 -->
+                <div class="thumb-slot" onclick="document.getElementById('simple-talk-2').click()">
+                    <img id="prev-talk-2" class="thumb-preview" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiPjwvc3ZnPg==" style="opacity:0.3">
+                    <div class="flex-1 cursor-pointer">
+                        <div class="text-xs font-bold text-gray-300">2. Mouth Closed</div>
+                        <div class="text-[10px] text-gray-500">Optional - Loops while talking</div>
+                    </div>
+                    <button class="text-xs text-red-400 px-2" onclick="event.stopPropagation(); clearSlot('talk', 2)">✕</button>
+                </div>
+                <input type="file" id="simple-talk-2" class="hidden" accept="image/*">
+            </div>
+        </div>
+
+        <!-- ADVANCED MODE UI -->
+        <div id="ui-advanced" class="hidden">
+            <div class="control-group">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="!mb-0">1. Idle Animation</label>
+                    <select id="select-idle-mode" class="w-1/2">
+                        <option value="loop">Mode: Loop</option>
+                        <option value="blink" selected>Mode: Blink</option>
+                    </select>
+                </div>
+                <div class="file-upload" onclick="document.getElementById('input-idle').click()">
+                    <span id="label-idle">📁 Bulk Upload Frames</span>
+                </div>
+                <input type="file" id="input-idle" class="hidden" multiple accept="image/*">
+                <div id="strip-idle" class="thumb-strip"></div>
+            </div>
+
+            <div class="control-group">
+                <label>2. Talking Animation</label>
+                <div class="file-upload" onclick="document.getElementById('input-talk').click()">
+                    <span>📁 Bulk Upload Frames</span>
+                </div>
+                <input type="file" id="input-talk" class="hidden" multiple accept="image/*">
+                <div id="strip-talk" class="thumb-strip"></div>
+            </div>
+
+            <div class="control-group">
+                <label>3. Shout Animation</label>
+                <div class="file-upload" onclick="document.getElementById('input-shout').click()">
+                    <span>📁 Bulk Upload Frames</span>
+                </div>
+                <input type="file" id="input-shout" class="hidden" multiple accept="image/*">
+                <div id="strip-shout" class="thumb-strip"></div>
+            </div>
+        </div>
+
+        <!-- Shared Settings -->
+        <div class="control-group mt-4">
+            <label>Parameters</label>
+            <div class="flex flex-col gap-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-400">Mic Sensitivity</span>
+                    <input type="range" id="slider-threshold" min="1" max="100" value="15" class="w-24">
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-400">Bounce (Physics)</span>
+                    <input type="range" id="slider-bounce" min="0" max="100" value="50" class="w-24">
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-400">Speed (FPS)</span>
+                    <input type="range" id="slider-speed" min="50" max="1000" step="50" value="200" class="w-24" dir="rtl">
+                </div>
+            </div>
+            <div class="text-center text-[10px] text-green-400 font-mono mt-2">Volume: <span id="vol-meter">0</span></div>
         </div>
 
         <div class="control-group">
-            <label>2. Talking Animation</label>
-            <div class="file-upload" onclick="document.getElementById('input-talk').click()">
-                <span id="label-talk">📁 Upload Frames (Select Multiple)</span>
-            </div>
-            <input type="file" id="input-talk" class="hidden" multiple accept="image/*">
-        </div>
-
-        <div class="control-group">
-            <label>3. Shout/Scream Animation</label>
-            <div class="file-upload" onclick="document.getElementById('input-shout').click()">
-                <span id="label-shout">📁 Upload Frames (Select Multiple)</span>
-            </div>
-            <input type="file" id="input-shout" class="hidden" multiple accept="image/*">
-            <div class="text-[10px] text-gray-500 mt-1">Triggers at high volume (see threshold below)</div>
-        </div>
-
-        <div class="control-group">
-            <label>4. Animation Speed (FPS)</label>
-            <div class="flex items-center gap-3">
-                <span class="text-xs w-8 text-right">Slow</span>
-                <input type="range" id="slider-speed" min="50" max="1000" step="50" value="200" dir="rtl">
-                <span class="text-xs w-8">Fast</span>
-            </div>
-            <div class="text-center text-xs text-gray-400 mt-1"><span id="speed-val">200</span>ms per frame</div>
-        </div>
-
-        <div class="control-group">
-            <label>5. Mic Sensitivity</label>
-            <input type="range" id="slider-threshold" min="1" max="100" value="15">
-            <div class="flex justify-between text-[10px] text-gray-500 mt-1">
-                <span>Sensitive</span>
-                <span>Current Volume: <span id="vol-meter" class="text-green-400 font-mono">0</span></span>
-                <span>Loud</span>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <label>6. Shout Threshold</label>
-            <input type="range" id="slider-shout-threshold" min="1" max="100" value="60">
-            <div class="flex justify-between text-[10px] text-gray-500 mt-1">
-                <span>Easy to Shout</span>
-                <span>Requires Screaming</span>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <label>7. Physics (Bounce)</label>
-            <input type="range" id="slider-bounce" min="0" max="100" value="50">
-        </div>
-
-        <div class="control-group">
-            <label>8. Background (Chroma Key)</label>
-            <div class="flex items-center gap-2 mb-2">
-                <input type="color" id="bg-color-picker" value="#00b140" class="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent">
-                <span class="text-xs text-gray-400">Pick Color</span>
-            </div>
-            <div class="file-upload" onclick="document.getElementById('input-bg').click()">
-                <span id="label-bg">🖼 Upload Background Image</span>
-            </div>
-            <input type="file" id="input-bg" class="hidden" accept="image/*">
-            <div class="flex gap-2 mt-2">
-                <button onclick="setBgSize('cover')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-[10px] py-1 rounded">Cover</button>
-                <button onclick="setBgSize('contain')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-[10px] py-1 rounded">Contain</button>
-                <button onclick="setBgSize('auto')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-[10px] py-1 rounded">Auto</button>
+            <label>Background</label>
+            <div class="flex items-center gap-2">
+                <input type="color" id="bg-color-picker" value="#00b140" class="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent">
+                <button onclick="document.getElementById('input-bg').click()" class="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">Upload Image</button>
+                <input type="file" id="input-bg" class="hidden" accept="image/*">
             </div>
         </div>
     </div>
@@ -199,128 +301,119 @@
     <div id="ui-trigger" class="absolute inset-0 z-0 hidden"></div>
 
     <script>
-        // Security Check
-        if (window.location.protocol === 'file:') {
-            alert("⚠️ Security Warning: Browsers block microphone access on local files (file://). Please upload this to GitHub Pages or run on localhost.");
-        }
+        // Security & Init
+        if (window.location.protocol === 'file:') alert("⚠️ Run this on localhost or GitHub Pages for Mic access.");
 
         const state = {
             audioContext: null,
             analyser: null,
-            microphone: null,
-            dataArray: null,
+            volume: 0,
             isTalking: false,
             isShouting: false,
+            // Frame Data
             idleFrames: ["https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png"],
             talkFrames: ["https://cdn3.emoji.gg/emojis/9686-blobcat-hyper.gif"],
-            shoutFrames: ["https://cdn3.emoji.gg/emojis/2324-blobcat-scared.png"], // Default Shout
+            shoutFrames: ["https://cdn3.emoji.gg/emojis/2324-blobcat-scared.png"],
+            // Animation State
             currentFrameIndex: 0,
             lastFrameTime: 0,
-            volume: 0
+            nextBlinkTime: 0,
+            isBlinking: false
         };
 
         const els = {
-            avatarContainer: document.getElementById('avatar-container'),
             avatarImg: document.getElementById('avatar-img'),
-            controls: document.getElementById('controls'),
+            container: document.getElementById('avatar-container'),
             volMeter: document.getElementById('vol-meter'),
-            uiTrigger: document.getElementById('ui-trigger'),
-            threshold: document.getElementById('slider-threshold'),
-            shoutThreshold: document.getElementById('slider-shout-threshold'),
-            bounce: document.getElementById('slider-bounce'),
-            speed: document.getElementById('slider-speed'),
-            speedVal: document.getElementById('speed-val'),
-            bgColor: document.getElementById('bg-color-picker')
+            idleMode: document.getElementById('select-idle-mode'),
+            strips: {
+                idle: document.getElementById('strip-idle'),
+                talk: document.getElementById('strip-talk'),
+                shout: document.getElementById('strip-shout')
+            }
         };
 
-        document.getElementById('btn-start').addEventListener('click', async () => {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                state.audioContext = new AudioContext();
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                state.microphone = state.audioContext.createMediaStreamSource(stream);
-                state.analyser = state.audioContext.createAnalyser();
-                state.analyser.fftSize = 512;
-                state.microphone.connect(state.analyser);
-                state.dataArray = new Uint8Array(state.analyser.frequencyBinCount);
-                
-                document.getElementById('btn-start').innerText = "✅ Mic Active";
-                document.getElementById('btn-start').className = "w-full bg-gray-700 text-green-400 font-bold py-2 rounded border border-green-900";
-                animate();
-            } catch (err) {
-                alert("Microphone denied. Please check permissions.");
-            }
-        });
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if (state.analyser) {
-                state.analyser.getByteFrequencyData(state.dataArray);
-                let sum = 0;
-                for(let i = 0; i < state.dataArray.length; i++) sum += state.dataArray[i];
-                const average = sum / state.dataArray.length;
-                state.volume = state.volume * 0.8 + average * 0.2;
-                els.volMeter.innerText = Math.floor(state.volume);
-            }
-
-            const threshold = parseInt(els.threshold.value);
-            const shoutThreshold = parseInt(els.shoutThreshold.value);
-
-            const wasTalking = state.isTalking;
-            const wasShouting = state.isShouting;
-
-            state.isShouting = state.volume > shoutThreshold;
-            state.isTalking = state.volume > threshold && !state.isShouting;
-
-            // Reset animation index if state changed
-            if (wasTalking !== state.isTalking || wasShouting !== state.isShouting) {
-                state.currentFrameIndex = 0;
-                state.lastFrameTime = 0;
-            }
-
-            const now = Date.now();
-            const frameDuration = parseInt(els.speed.value); 
+        // --- Mode Switching ---
+        window.switchMode = (mode) => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
             
-            if (now - state.lastFrameTime > frameDuration) {
-                let activeFrames = state.idleFrames;
-                if (state.isShouting) activeFrames = state.shoutFrames;
-                else if (state.isTalking) activeFrames = state.talkFrames;
-
-                state.currentFrameIndex = (state.currentFrameIndex + 1) % activeFrames.length;
-                if(activeFrames.length > 0) els.avatarImg.src = activeFrames[state.currentFrameIndex];
-                state.lastFrameTime = now;
-            }
-
-            const bounceFactor = parseInt(els.bounce.value) / 1000;
-            let scaleY = 1, scaleX = 1, translateY = 0;
-
-            if (state.volume > 1) {
-                const intensity = Math.max(0, state.volume - threshold); 
-                const deformation = intensity * bounceFactor; 
-                scaleY = 1 + deformation;
-                scaleX = 1 - (deformation * 0.4); 
-                translateY = - (deformation * 50); 
-            }
-
-            let rotate = 0;
-            // More chaotic rotation if shouting
-            if (state.isShouting) {
-                rotate = (Math.random() - 0.5) * (state.volume / 5);
-            } else if (state.volume > 60) {
-                rotate = (Math.random() - 0.5) * (state.volume / 10);
-            }
-
-            els.avatarContainer.style.transform = `translate(-50%, -50%) translate(0px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
-            
-            // Add extra visual flair for shouting (red tint/brightness)
-            if (state.isShouting) {
-                 els.avatarImg.style.filter = "brightness(1.5) saturate(1.5)";
+            if (mode === 'simple') {
+                document.getElementById('ui-simple').classList.remove('hidden');
+                document.getElementById('ui-advanced').classList.add('hidden');
+                // Sync Simple UI with current state if possible
+                syncSimpleUI();
             } else {
-                 els.avatarImg.style.filter = state.volume > 90 ? "brightness(1.3)" : "brightness(1.0)";
+                document.getElementById('ui-simple').classList.add('hidden');
+                document.getElementById('ui-advanced').classList.remove('hidden');
+                renderAllStrips();
+            }
+        };
+
+        // --- Simple Mode Logic ---
+        function handleSimpleUpload(type, index) {
+            const inputId = `simple-${type}-${index}`;
+            const imgId = `prev-${type}-${index}`;
+            
+            document.getElementById(inputId).addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const result = ev.target.result;
+                    document.getElementById(imgId).src = result;
+                    document.getElementById(imgId).style.opacity = "1.0";
+                    
+                    // Update State
+                    if (type === 'idle') {
+                        state.idleFrames[index - 1] = result;
+                        // Auto-enable blink if slot 2 is filled
+                        if (index === 2) els.idleMode.value = 'blink';
+                    } else if (type === 'talk') {
+                        state.talkFrames[index - 1] = result;
+                    }
+                    
+                    // If switching to advanced later, this ensures data is consistent
+                    renderAllStrips();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        ['idle', 'talk'].forEach(t => { handleSimpleUpload(t, 1); handleSimpleUpload(t, 2); });
+
+        window.clearSlot = (type, index) => {
+            const imgId = `prev-${type}-${index}`;
+            document.getElementById(imgId).src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiPjwvc3ZnPg==";
+            document.getElementById(imgId).style.opacity = "0.3";
+            
+            // Remove from state array
+            if (type === 'idle') {
+                state.idleFrames.splice(index - 1, 1);
+                if (state.idleFrames.length < 2) els.idleMode.value = 'loop';
+            } else if (type === 'talk') {
+                state.talkFrames.splice(index - 1, 1);
+            }
+            renderAllStrips();
+        };
+
+        function syncSimpleUI() {
+            // Update thumbnails in simple mode based on current state arrays
+            if(state.idleFrames[0]) document.getElementById('prev-idle-1').src = state.idleFrames[0];
+            if(state.idleFrames[1]) {
+                document.getElementById('prev-idle-2').src = state.idleFrames[1];
+                document.getElementById('prev-idle-2').style.opacity = "1.0";
+            }
+            if(state.talkFrames[0]) document.getElementById('prev-talk-1').src = state.talkFrames[0];
+            if(state.talkFrames[1]) {
+                document.getElementById('prev-talk-2').src = state.talkFrames[1];
+                document.getElementById('prev-talk-2').style.opacity = "1.0";
             }
         }
 
-        function handleUpload(inputId, labelId, stateKey) {
+        // --- Advanced Mode Logic ---
+        function handleAdvancedUpload(inputId, stateKey, stripId) {
             document.getElementById(inputId).addEventListener('change', function(e) {
                 const files = Array.from(e.target.files);
                 if (files.length > 0) {
@@ -334,8 +427,8 @@
                             loadedCount++;
                             if (loadedCount === files.length) {
                                 state[stateKey] = loadedFrames;
-                                document.getElementById(labelId).innerText = `✅ Loaded ${files.length} frames`;
-                                document.getElementById(labelId).classList.add('text-green-400');
+                                renderStrip(stateKey, stripId);
+                                syncSimpleUI(); // Update simple mode thumbnails too
                             }
                         };
                         reader.readAsDataURL(file);
@@ -344,40 +437,157 @@
             });
         }
 
-        handleUpload('input-idle', 'label-idle', 'idleFrames');
-        handleUpload('input-talk', 'label-talk', 'talkFrames');
-        handleUpload('input-shout', 'label-shout', 'shoutFrames');
+        function renderStrip(stateKey, elementId) {
+            const container = typeof elementId === 'string' ? document.getElementById(elementId) : elementId;
+            container.innerHTML = '';
+            state[stateKey].forEach(src => {
+                const img = document.createElement('img');
+                img.src = src;
+                container.appendChild(img);
+            });
+        }
 
-        els.bgColor.addEventListener('input', (e) => {
-            document.body.style.backgroundImage = 'none';
-            document.body.style.backgroundColor = e.target.value;
+        function renderAllStrips() {
+            renderStrip('idleFrames', els.strips.idle);
+            renderStrip('talkFrames', els.strips.talk);
+            renderStrip('shoutFrames', els.strips.shout);
+        }
+
+        handleAdvancedUpload('input-idle', 'idleFrames', 'strip-idle');
+        handleAdvancedUpload('input-talk', 'talkFrames', 'strip-talk');
+        handleAdvancedUpload('input-shout', 'shoutFrames', 'strip-shout');
+
+        // --- Animation Engine ---
+        document.getElementById('btn-start').addEventListener('click', async () => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                state.audioContext = new AudioContext();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const source = state.audioContext.createMediaStreamSource(stream);
+                state.analyser = state.audioContext.createAnalyser();
+                state.analyser.fftSize = 512;
+                source.connect(state.analyser);
+                
+                document.getElementById('btn-start').innerText = "✅ Active";
+                document.getElementById('btn-start').classList.replace('bg-purple-600', 'bg-gray-700');
+                animate();
+            } catch (err) { alert("Mic Error: " + err); }
         });
 
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 1. Audio Processing
+            if (state.analyser) {
+                const dataArray = new Uint8Array(state.analyser.frequencyBinCount);
+                state.analyser.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a,b) => a+b, 0) / dataArray.length;
+                state.volume = state.volume * 0.8 + average * 0.2;
+                els.volMeter.innerText = Math.floor(state.volume);
+            }
+
+            // 2. State Logic
+            const threshold = parseInt(document.getElementById('slider-threshold').value);
+            const bounceStrength = parseInt(document.getElementById('slider-bounce').value);
+            const speed = parseInt(document.getElementById('slider-speed').value);
+            
+            const wasTalking = state.isTalking;
+            const wasShouting = state.isShouting;
+            
+            // Shout logic: arbitrarily set to threshold + 40 (max 90)
+            const shoutThresh = Math.min(90, threshold + 40);
+            
+            state.isShouting = state.volume > shoutThresh;
+            state.isTalking = state.volume > threshold && !state.isShouting;
+
+            if (wasTalking !== state.isTalking || wasShouting !== state.isShouting) {
+                state.currentFrameIndex = 0;
+                state.lastFrameTime = 0;
+                state.isBlinking = false;
+            }
+
+            // 3. Frame Selection
+            const now = Date.now();
+            if (now - state.lastFrameTime > speed) {
+                let activeFrames = state.idleFrames;
+                let mode = 'loop';
+
+                if (state.isShouting && state.shoutFrames.length > 0) {
+                    activeFrames = state.shoutFrames;
+                } else if (state.isTalking) {
+                    activeFrames = state.talkFrames;
+                } else {
+                    mode = els.idleMode.value; // Blink or Loop
+                }
+
+                if (mode === 'blink' && !state.isTalking && !state.isShouting) {
+                    // Smart Blink Logic
+                    if (!state.isBlinking) {
+                        state.currentFrameIndex = 0; // Eyes Open
+                        if (now > state.nextBlinkTime) {
+                            state.isBlinking = true;
+                            state.currentFrameIndex = activeFrames.length > 1 ? 1 : 0; // Start blink
+                        }
+                    } else {
+                        state.currentFrameIndex++;
+                        if (state.currentFrameIndex >= activeFrames.length) {
+                            state.isBlinking = false;
+                            state.currentFrameIndex = 0;
+                            state.nextBlinkTime = now + (Math.random() * 3000) + 2000;
+                        }
+                    }
+                } else {
+                    // Standard Loop
+                    state.currentFrameIndex = (state.currentFrameIndex + 1) % activeFrames.length;
+                }
+
+                if (activeFrames[state.currentFrameIndex]) {
+                    els.avatarImg.src = activeFrames[state.currentFrameIndex];
+                }
+                state.lastFrameTime = now;
+            }
+
+            // 4. Physics & Transforms
+            let ty = 0, sx = 1, sy = 1, rot = 0;
+            if (state.volume > 5) {
+                const deform = (Math.max(0, state.volume - threshold) * bounceStrength) / 2000;
+                sy = 1 + deform;
+                sx = 1 - (deform * 0.5);
+                ty = -(deform * 100);
+                if (state.volume > 60) rot = (Math.random() - 0.5) * (state.volume / 10);
+            }
+
+            els.container.style.transform = `translate(-50%, -50%) translate(0, ${ty}px) scale(${sx}, ${sy}) rotate(${rot}deg)`;
+            
+            // 5. Visual Effects
+            els.avatarImg.style.filter = state.isShouting ? "brightness(1.4) saturate(1.3)" : 
+                                         state.volume > 80 ? "brightness(1.1)" : "brightness(1)";
+        }
+
+        // Init BG logic
+        document.getElementById('bg-color-picker').addEventListener('input', (e) => {
+             document.body.style.backgroundImage = 'none';
+             document.body.style.backgroundColor = e.target.value;
+        });
         document.getElementById('input-bg').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    document.body.style.backgroundImage = `url(${e.target.result})`;
-                    document.getElementById('label-bg').innerText = "✅ BG Loaded";
-                };
-                reader.readAsDataURL(file);
+            const f = e.target.files[0];
+            if(f) {
+                const r = new FileReader();
+                r.onload = (ev) => document.body.style.backgroundImage = `url(${ev.target.result})`;
+                r.readAsDataURL(f);
             }
         });
-
-        window.setBgSize = (size) => { document.body.style.backgroundSize = size; };
-
         document.getElementById('hide-ui').addEventListener('click', () => {
-            els.controls.classList.add('hidden');
-            els.uiTrigger.classList.remove('hidden');
+            document.getElementById('controls').classList.add('hidden');
+            document.getElementById('ui-trigger').classList.remove('hidden');
+        });
+        document.getElementById('ui-trigger').addEventListener('click', () => {
+            document.getElementById('controls').classList.remove('hidden');
+            document.getElementById('ui-trigger').classList.add('hidden');
         });
 
-        els.uiTrigger.addEventListener('click', () => {
-            els.controls.classList.remove('hidden');
-            els.uiTrigger.classList.add('hidden');
-        });
-
-        els.speed.addEventListener('input', (e) => { els.speedVal.innerText = e.target.value; });
+        // Initialize strips
+        renderAllStrips();
     </script>
 </body>
 </html>
