@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.0</title>
+    <title>Salamander WebTuber v4.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -32,21 +32,25 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            /* FIX: Ensure this layer receives clicks even if parent has pointer-events: none */
+            pointer-events: auto; 
         }
         .interactive-layer:active { cursor: grabbing; }
         .interactive-layer.locked { cursor: default; pointer-events: none; }
 
-        /* Z-INDEX ORDERING IS CRITICAL HERE */
-        
-        /* 1. Background (Bottom) */
+        /* Background specific */
         #bg-wrapper {
             top: 50%; left: 50%;
             width: 100vw; height: 100vh;
             z-index: 0;
         }
-        #bg-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        #bg-img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
 
-        /* 2. Avatar (Middle) */
+        /* Avatar specific */
         #avatar-wrapper {
             top: 50%; left: 50%;
             width: 400px; height: 400px;
@@ -54,7 +58,7 @@
             transform: translate(-50%, -50%) scale(1); 
         }
 
-        /* Physics Container inside Avatar Wrapper */
+        /* The Physics Container (Inside wrapper) */
         #avatar-physics {
             width: 100%;
             height: 100%;
@@ -62,7 +66,8 @@
             justify-content: center;
             align-items: flex-end;
             transform-origin: bottom center;
-            pointer-events: none; /* Pass drag events to wrapper or pinned items */
+            /* Container shouldn't block clicks to things behind it, but children need events */
+            pointer-events: none; 
             transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
         }
@@ -76,17 +81,14 @@
         }
 
         /* 3. Pinned Props (Attached to Avatar Physics) */
-        /* These live INSIDE #avatar-physics so they bounce */
         .prop-pinned {
             z-index: 15;
-            /* Default center */
             top: 20%; left: 50%; 
             width: 150px; height: 150px;
         }
         .prop-pinned img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
         /* 4. Static Props (Foreground / Desk) */
-        /* These live OUTSIDE physics, sitting in front */
         #prop-static-wrapper {
             top: 80%; left: 50%;
             width: 600px; height: 300px;
@@ -175,8 +177,16 @@
         .file-btn {
             background: rgba(255,255,255,0.05); border: 1px dashed #6b7280;
             padding: 8px; border-radius: 6px; text-align: center; cursor: pointer; font-size: 12px; color: #d1d5db; transition: all 0.2s;
+            flex: 1; /* For flex layouts */
         }
         .file-btn:hover { border-color: #a855f7; background: rgba(168, 85, 247, 0.1); color: white; }
+
+        .btn-clear {
+            background: rgba(153, 27, 27, 0.3); border: 1px dashed #7f1d1d;
+            color: #fca5a5; width: 32px; display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-clear:hover { background: rgba(185, 28, 28, 0.6); color: white; border-color: #ef4444; }
 
         .toggle-btn { @apply text-xs py-1 px-3 rounded border border-gray-600 bg-gray-800 text-gray-300 transition hover:bg-gray-700 cursor-pointer; }
         .toggle-btn.active { @apply bg-purple-600 border-purple-500 text-white; }
@@ -237,7 +247,7 @@
             </div>
         </div>
 
-        <!-- 3. Static Prop (Foreground - No Physics) -->
+        <!-- 3. Static Prop (Foreground / Desk) -->
         <div id="prop-static-wrapper" class="interactive-layer" style="display:none;">
             <img id="prop-static-img" src="">
         </div>
@@ -250,7 +260,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.0</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.1</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -294,11 +304,21 @@
         <div class="control-group">
             <label>Avatar Images (Current Mode)</label>
             <div class="grid grid-cols-2 gap-2">
-                <div class="file-btn" onclick="document.getElementById('input-idle').click()">
-                    <span id="label-idle">📂 Idle Frames</span>
+                <!-- Idle -->
+                <div class="flex gap-1">
+                    <div class="file-btn" onclick="document.getElementById('input-idle').click()">
+                        <span id="label-idle">📂 Idle Frames</span>
+                    </div>
+                    <!-- Clear Button -->
+                    <button class="btn-clear" onclick="clearFrames('idle')" title="Clear Idle">🗑</button>
                 </div>
-                <div class="file-btn" onclick="document.getElementById('input-talk').click()">
-                    <span id="label-talk">📂 Talk Frames</span>
+                <!-- Talk -->
+                <div class="flex gap-1">
+                    <div class="file-btn" onclick="document.getElementById('input-talk').click()">
+                        <span id="label-talk">📂 Talk Frames</span>
+                    </div>
+                    <!-- Clear Button -->
+                    <button class="btn-clear" onclick="clearFrames('talk')" title="Clear Talk">🗑</button>
                 </div>
             </div>
             <input type="file" id="input-idle" class="hidden" multiple accept="image/*">
@@ -309,11 +329,19 @@
         <div class="control-group">
             <label>Props & Layers</label>
             <div class="grid grid-cols-2 gap-2">
-                <div class="file-btn" onclick="document.getElementById('input-prop-pinned').click()">
-                    <span id="label-prop-pinned">🎩 Pinned (Hat)</span>
+                <!-- Pinned -->
+                <div class="flex gap-1">
+                    <div class="file-btn" onclick="document.getElementById('input-prop-pinned').click()">
+                        <span id="label-prop-pinned">🎩 Pinned</span>
+                    </div>
+                    <button class="btn-clear" onclick="clearProp('pinned')" title="Remove Prop">🗑</button>
                 </div>
-                <div class="file-btn" onclick="document.getElementById('input-prop-static').click()">
-                    <span id="label-prop-static">🎤 Static (Desk)</span>
+                <!-- Static -->
+                <div class="flex gap-1">
+                    <div class="file-btn" onclick="document.getElementById('input-prop-static').click()">
+                        <span id="label-prop-static">🎤 Static</span>
+                    </div>
+                    <button class="btn-clear" onclick="clearProp('static')" title="Remove Prop">🗑</button>
                 </div>
             </div>
             <div class="text-[10px] text-gray-500 mt-1">
@@ -431,11 +459,12 @@
 
         <div class="control-group">
             <label>Background</label>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1">
                 <input type="color" id="bg-color-picker" value="#00b140" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0">
                 <div class="file-btn flex-1" onclick="document.getElementById('input-bg').click()">
-                    <span id="label-bg">🖼 Upload Image</span>
+                    <span id="label-bg">🖼 Upload</span>
                 </div>
+                <button class="btn-clear" onclick="clearBg()" title="Clear Background">🗑</button>
             </div>
             <input type="file" id="input-bg" class="hidden" accept="image/*">
         </div>
@@ -620,6 +649,42 @@
             }
         };
 
+        // --- REMOVAL LOGIC ---
+        window.clearFrames = (type) => {
+            if(confirm(`Clear ${type} frames for this mode?`)) {
+                state.modes[state.activeMode][type] = [];
+                // Update UI
+                const label = document.getElementById(`label-${type}`);
+                label.innerText = `📂 ${type.charAt(0).toUpperCase() + type.slice(1)} Frames`;
+                label.parentElement.classList.remove('border-green-500', 'text-green-400');
+                if(type === 'idle') els.avatarImg.src = "";
+                saveAuto();
+            }
+        };
+
+        window.clearProp = (type) => {
+            if(confirm(`Remove ${type} prop?`)) {
+                const wrapper = document.getElementById(`prop-${type}-wrapper`);
+                const img = document.getElementById(`prop-${type}-img`);
+                const label = document.getElementById(`label-prop-${type}`);
+                
+                img.src = "";
+                wrapper.style.display = 'none';
+                label.innerText = type === 'pinned' ? "🎩 Pinned" : "🎤 Static";
+                
+                saveAuto();
+            }
+        };
+
+        window.clearBg = () => {
+            if(confirm("Remove background image?")) {
+                els.bgImg.src = "";
+                els.bgImg.style.display = 'none';
+                document.getElementById('label-bg').innerText = "🖼 Upload";
+                saveAuto();
+            }
+        };
+
         // --- INPUT CONFIGURATION ---
         function setupKeyBinders() {
             [1,2,3,4].forEach(id => {
@@ -656,15 +721,33 @@
             
             const idleCount = state.modes[modeId].idle.length;
             const talkCount = state.modes[modeId].talk.length;
-            document.getElementById('label-idle').innerText = idleCount > 0 ? `✅ ${idleCount} Frames` : `📂 Idle Frames`;
-            document.getElementById('label-talk').innerText = talkCount > 0 ? `✅ ${talkCount} Frames` : `📂 Talk Frames`;
+            
+            // UI State
+            const idleLabel = document.getElementById('label-idle');
+            const talkLabel = document.getElementById('label-talk');
+            
+            if(idleCount > 0) {
+                idleLabel.innerText = `✅ ${idleCount} Frames`;
+                idleLabel.parentElement.classList.add('border-green-500', 'text-green-400');
+            } else {
+                idleLabel.innerText = `📂 Idle Frames`;
+                idleLabel.parentElement.classList.remove('border-green-500', 'text-green-400');
+            }
+            
+            if(talkCount > 0) {
+                talkLabel.innerText = `✅ ${talkCount} Frames`;
+                talkLabel.parentElement.classList.add('border-green-500', 'text-green-400');
+            } else {
+                talkLabel.innerText = `📂 Talk Frames`;
+                talkLabel.parentElement.classList.remove('border-green-500', 'text-green-400');
+            }
             
             state.currentFrameIndex = 0;
             state.isBlinking = false;
             
             const activeFrames = state.modes[modeId].idle;
             if(activeFrames.length > 0) els.avatarImg.src = activeFrames[0];
-            else els.avatarImg.src = ""; 
+            else els.avatarImg.src = ""; // Or clear transparent
         };
 
         // --- TWITCH INTEGRATION ---
