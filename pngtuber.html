@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salamander WebTuber v2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #00b140; /* Default Green Screen */
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: background-color 0.3s;
+        }
+        
+        /* The Avatar Container */
+        #avatar-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            /* Physics Transition (Fast for bounce) */
+            transition: transform 0.05s linear; 
+            pointer-events: none; 
+        }
+
+        /* The Avatar Image */
+        #avatar-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: filter 0.1s;
+        }
+
+        /* UI Controls */
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(17, 24, 39, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            width: 340px;
+            max-height: 90vh;
+            overflow-y: auto;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid #374151;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Custom Scrollbar */
+        #controls::-webkit-scrollbar { width: 8px; }
+        #controls::-webkit-scrollbar-track { background: #1f2937; }
+        #controls::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+
+        .control-group { margin-bottom: 15px; border-bottom: 1px solid #374151; padding-bottom: 15px; }
+        .control-group:last-child { border-bottom: none; }
+        .control-group label { display: block; font-size: 11px; text-transform: uppercase; font-weight: bold; margin-bottom: 6px; color: #9ca3af; letter-spacing: 0.05em; }
+        
+        input[type="range"] { width: 100%; accent-color: #a855f7; height: 6px; background: #374151; border-radius: 5px; appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #a855f7; border-radius: 50%; cursor: pointer; }
+        
+        .file-upload {
+            border: 2px dashed #4b5563;
+            padding: 12px;
+            text-align: center;
+            font-size: 13px;
+            cursor: pointer;
+            margin-bottom: 5px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.02);
+        }
+        .file-upload:hover { border-color: #a855f7; background: rgba(168, 85, 247, 0.1); color: #e9d5ff; }
+
+        #hide-ui {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 18px;
+            transition: color 0.2s;
+        }
+        #hide-ui:hover { color: white; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Avatar Stage -->
+    <div id="avatar-container">
+        <!-- Default Placeholder -->
+        <img id="avatar-img" src="https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png">
+    </div>
+
+    <!-- UI Panel -->
+    <div id="controls">
+        <button id="hide-ui" title="Hide Controls">✕</button>
+        
+        <h1 class="text-xl font-bold mb-1 text-white">Web<span class="text-purple-500">Tuber</span> <span class="text-xs font-normal text-gray-500 ml-1">v2.1</span></h1>
+        <p class="text-xs text-gray-400 mb-4">Frame-based Animation Engine</p>
+
+        <div class="control-group">
+            <button id="btn-start" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded transition shadow-lg shadow-purple-900/50">🎤 Activate Mic</button>
+        </div>
+
+        <div class="control-group">
+            <label>1. Idle Animation</label>
+            <div class="file-upload" onclick="document.getElementById('input-idle').click()">
+                <span id="label-idle">📁 Upload Frames (Select Multiple)</span>
+            </div>
+            <input type="file" id="input-idle" class="hidden" multiple accept="image/*">
+            <div class="text-[10px] text-gray-500 mt-1">Order based on filename (01.png, 02.png...)</div>
+        </div>
+
+        <div class="control-group">
+            <label>2. Talking Animation</label>
+            <div class="file-upload" onclick="document.getElementById('input-talk').click()">
+                <span id="label-talk">📁 Upload Frames (Select Multiple)</span>
+            </div>
+            <input type="file" id="input-talk" class="hidden" multiple accept="image/*">
+        </div>
+
+        <div class="control-group">
+            <label>3. Shout/Scream Animation</label>
+            <div class="file-upload" onclick="document.getElementById('input-shout').click()">
+                <span id="label-shout">📁 Upload Frames (Select Multiple)</span>
+            </div>
+            <input type="file" id="input-shout" class="hidden" multiple accept="image/*">
+            <div class="text-[10px] text-gray-500 mt-1">Triggers at high volume (see threshold below)</div>
+        </div>
+
+        <div class="control-group">
+            <label>4. Animation Speed (FPS)</label>
+            <div class="flex items-center gap-3">
+                <span class="text-xs w-8 text-right">Slow</span>
+                <input type="range" id="slider-speed" min="50" max="1000" step="50" value="200" dir="rtl">
+                <span class="text-xs w-8">Fast</span>
+            </div>
+            <div class="text-center text-xs text-gray-400 mt-1"><span id="speed-val">200</span>ms per frame</div>
+        </div>
+
+        <div class="control-group">
+            <label>5. Mic Sensitivity</label>
+            <input type="range" id="slider-threshold" min="1" max="100" value="15">
+            <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>Sensitive</span>
+                <span>Current Volume: <span id="vol-meter" class="text-green-400 font-mono">0</span></span>
+                <span>Loud</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>6. Shout Threshold</label>
+            <input type="range" id="slider-shout-threshold" min="1" max="100" value="60">
+            <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>Easy to Shout</span>
+                <span>Requires Screaming</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>7. Physics (Bounce)</label>
+            <input type="range" id="slider-bounce" min="0" max="100" value="50">
+        </div>
+
+        <div class="control-group">
+            <label>8. Background (Chroma Key)</label>
+            <div class="flex items-center gap-2 mb-2">
+                <input type="color" id="bg-color-picker" value="#00b140" class="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent">
+                <span class="text-xs text-gray-400">Pick Color</span>
+            </div>
+            <div class="file-upload" onclick="document.getElementById('input-bg').click()">
+                <span id="label-bg">🖼 Upload Background Image</span>
+            </div>
+            <input type="file" id="input-bg" class="hidden" accept="image/*">
+            <div class="flex gap-2 mt-2">
+                <button onclick="setBgSize('cover')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-[10px] py-1 rounded">Cover</button>
+                <button onclick="setBgSize('contain')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-[10px] py-1 rounded">Contain</button>
+                <button onclick="setBgSize('auto')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-[10px] py-1 rounded">Auto</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ui-trigger" class="absolute inset-0 z-0 hidden"></div>
+
+    <script>
+        // Security Check
+        if (window.location.protocol === 'file:') {
+            alert("⚠️ Security Warning: Browsers block microphone access on local files (file://). Please upload this to GitHub Pages or run on localhost.");
+        }
+
+        const state = {
+            audioContext: null,
+            analyser: null,
+            microphone: null,
+            dataArray: null,
+            isTalking: false,
+            isShouting: false,
+            idleFrames: ["https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png"],
+            talkFrames: ["https://cdn3.emoji.gg/emojis/9686-blobcat-hyper.gif"],
+            shoutFrames: ["https://cdn3.emoji.gg/emojis/2324-blobcat-scared.png"], // Default Shout
+            currentFrameIndex: 0,
+            lastFrameTime: 0,
+            volume: 0
+        };
+
+        const els = {
+            avatarContainer: document.getElementById('avatar-container'),
+            avatarImg: document.getElementById('avatar-img'),
+            controls: document.getElementById('controls'),
+            volMeter: document.getElementById('vol-meter'),
+            uiTrigger: document.getElementById('ui-trigger'),
+            threshold: document.getElementById('slider-threshold'),
+            shoutThreshold: document.getElementById('slider-shout-threshold'),
+            bounce: document.getElementById('slider-bounce'),
+            speed: document.getElementById('slider-speed'),
+            speedVal: document.getElementById('speed-val'),
+            bgColor: document.getElementById('bg-color-picker')
+        };
+
+        document.getElementById('btn-start').addEventListener('click', async () => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                state.audioContext = new AudioContext();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                state.microphone = state.audioContext.createMediaStreamSource(stream);
+                state.analyser = state.audioContext.createAnalyser();
+                state.analyser.fftSize = 512;
+                state.microphone.connect(state.analyser);
+                state.dataArray = new Uint8Array(state.analyser.frequencyBinCount);
+                
+                document.getElementById('btn-start').innerText = "✅ Mic Active";
+                document.getElementById('btn-start').className = "w-full bg-gray-700 text-green-400 font-bold py-2 rounded border border-green-900";
+                animate();
+            } catch (err) {
+                alert("Microphone denied. Please check permissions.");
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (state.analyser) {
+                state.analyser.getByteFrequencyData(state.dataArray);
+                let sum = 0;
+                for(let i = 0; i < state.dataArray.length; i++) sum += state.dataArray[i];
+                const average = sum / state.dataArray.length;
+                state.volume = state.volume * 0.8 + average * 0.2;
+                els.volMeter.innerText = Math.floor(state.volume);
+            }
+
+            const threshold = parseInt(els.threshold.value);
+            const shoutThreshold = parseInt(els.shoutThreshold.value);
+
+            const wasTalking = state.isTalking;
+            const wasShouting = state.isShouting;
+
+            state.isShouting = state.volume > shoutThreshold;
+            state.isTalking = state.volume > threshold && !state.isShouting;
+
+            // Reset animation index if state changed
+            if (wasTalking !== state.isTalking || wasShouting !== state.isShouting) {
+                state.currentFrameIndex = 0;
+                state.lastFrameTime = 0;
+            }
+
+            const now = Date.now();
+            const frameDuration = parseInt(els.speed.value); 
+            
+            if (now - state.lastFrameTime > frameDuration) {
+                let activeFrames = state.idleFrames;
+                if (state.isShouting) activeFrames = state.shoutFrames;
+                else if (state.isTalking) activeFrames = state.talkFrames;
+
+                state.currentFrameIndex = (state.currentFrameIndex + 1) % activeFrames.length;
+                if(activeFrames.length > 0) els.avatarImg.src = activeFrames[state.currentFrameIndex];
+                state.lastFrameTime = now;
+            }
+
+            const bounceFactor = parseInt(els.bounce.value) / 1000;
+            let scaleY = 1, scaleX = 1, translateY = 0;
+
+            if (state.volume > 1) {
+                const intensity = Math.max(0, state.volume - threshold); 
+                const deformation = intensity * bounceFactor; 
+                scaleY = 1 + deformation;
+                scaleX = 1 - (deformation * 0.4); 
+                translateY = - (deformation * 50); 
+            }
+
+            let rotate = 0;
+            // More chaotic rotation if shouting
+            if (state.isShouting) {
+                rotate = (Math.random() - 0.5) * (state.volume / 5);
+            } else if (state.volume > 60) {
+                rotate = (Math.random() - 0.5) * (state.volume / 10);
+            }
+
+            els.avatarContainer.style.transform = `translate(-50%, -50%) translate(0px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
+            
+            // Add extra visual flair for shouting (red tint/brightness)
+            if (state.isShouting) {
+                 els.avatarImg.style.filter = "brightness(1.5) saturate(1.5)";
+            } else {
+                 els.avatarImg.style.filter = state.volume > 90 ? "brightness(1.3)" : "brightness(1.0)";
+            }
+        }
+
+        function handleUpload(inputId, labelId, stateKey) {
+            document.getElementById(inputId).addEventListener('change', function(e) {
+                const files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+                    const loadedFrames = [];
+                    let loadedCount = 0;
+                    files.forEach((file, index) => {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            loadedFrames[index] = event.target.result;
+                            loadedCount++;
+                            if (loadedCount === files.length) {
+                                state[stateKey] = loadedFrames;
+                                document.getElementById(labelId).innerText = `✅ Loaded ${files.length} frames`;
+                                document.getElementById(labelId).classList.add('text-green-400');
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+            });
+        }
+
+        handleUpload('input-idle', 'label-idle', 'idleFrames');
+        handleUpload('input-talk', 'label-talk', 'talkFrames');
+        handleUpload('input-shout', 'label-shout', 'shoutFrames');
+
+        els.bgColor.addEventListener('input', (e) => {
+            document.body.style.backgroundImage = 'none';
+            document.body.style.backgroundColor = e.target.value;
+        });
+
+        document.getElementById('input-bg').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.body.style.backgroundImage = `url(${e.target.result})`;
+                    document.getElementById('label-bg').innerText = "✅ BG Loaded";
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        window.setBgSize = (size) => { document.body.style.backgroundSize = size; };
+
+        document.getElementById('hide-ui').addEventListener('click', () => {
+            els.controls.classList.add('hidden');
+            els.uiTrigger.classList.remove('hidden');
+        });
+
+        els.uiTrigger.addEventListener('click', () => {
+            els.controls.classList.remove('hidden');
+            els.uiTrigger.classList.add('hidden');
+        });
+
+        els.speed.addEventListener('input', (e) => { els.speedVal.innerText = e.target.value; });
+    </script>
+</body>
+</html>
