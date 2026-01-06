@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v2.2</title>
+    <title>Salamander WebTuber v2.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { 
@@ -18,7 +18,6 @@
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             overflow: hidden;
-            /* Green screen default behind everything */
             background-color: #00b140; 
         }
 
@@ -28,7 +27,6 @@
             transform-origin: center center;
             cursor: grab;
             user-select: none;
-            /* Flex center to make image handling easier */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -44,7 +42,7 @@
         }
         #bg-img {
             width: 100%; height: 100%;
-            object-fit: cover; /* Default to cover, but adjustable via scale */
+            object-fit: cover;
             pointer-events: none;
         }
 
@@ -53,7 +51,6 @@
             top: 50%; left: 50%;
             width: 400px; height: 400px;
             z-index: 10;
-            /* Start centered */
             transform: translate(-50%, -50%) scale(1); 
         }
 
@@ -65,7 +62,7 @@
             justify-content: center;
             align-items: flex-end;
             transform-origin: bottom center;
-            pointer-events: none; /* Let drag pass to wrapper */
+            pointer-events: none;
             transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
@@ -77,17 +74,21 @@
             transition: filter 0.1s;
         }
 
-        /* Swear Symbols */
+        /* Swear Symbols - Fixed Opacity */
         .swear-symbol {
             position: absolute;
             font-weight: 900;
             color: #ef4444; 
             text-shadow: 2px 2px 0px #000;
             font-family: 'Comic Sans MS', sans-serif;
-            opacity: 0;
+            opacity: 1; /* Fixed visibility */
             pointer-events: none;
-            transition: opacity 0.1s;
             z-index: 20;
+        }
+        /* Swear Layer controls visibility */
+        #swear-layer {
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
         }
 
         /* --- UI CONTROLS --- */
@@ -98,7 +99,7 @@
             padding: 20px;
             border-radius: 12px;
             color: white;
-            width: 320px;
+            width: 340px;
             max-height: 90vh;
             overflow-y: auto;
             z-index: 1000;
@@ -108,13 +109,12 @@
             transition: transform 0.3s ease, opacity 0.3s ease;
         }
         #controls.hidden {
-            display: block !important; /* Override Tailwind hidden */
-            transform: translateX(-350px);
+            display: block !important;
+            transform: translateX(-380px);
             opacity: 0;
             pointer-events: none;
         }
 
-        /* Scrollbar */
         #controls::-webkit-scrollbar { width: 6px; }
         #controls::-webkit-scrollbar-track { background: #1f2937; }
         #controls::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
@@ -134,7 +134,6 @@
         .toggle-btn { @apply text-xs py-1 px-3 rounded border border-gray-600 bg-gray-800 text-gray-300 transition hover:bg-gray-700 cursor-pointer; }
         .toggle-btn.active { @apply bg-purple-600 border-purple-500 text-white; }
 
-        /* Hint Overlay */
         #hint-overlay {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.7); color: #ccc; padding: 5px 15px; border-radius: 20px;
@@ -142,6 +141,11 @@
         }
         .show-hint #hint-overlay { opacity: 1; }
 
+        /* Accordion style for Advanced settings */
+        details summary { cursor: pointer; list-style: none; font-size: 12px; color: #9ca3af; outline: none; }
+        details summary::-webkit-details-marker { display: none; }
+        details summary:hover { color: #fff; }
+        details[open] summary { margin-bottom: 10px; }
     </style>
 </head>
 <body class="show-hint">
@@ -151,7 +155,7 @@
         
         <!-- Background Layer -->
         <div id="bg-wrapper" class="interactive-layer">
-            <img id="bg-img" src="" style="display:none;"> <!-- Hidden until loaded -->
+            <img id="bg-img" src="" style="display:none;">
         </div>
 
         <!-- Avatar Layer -->
@@ -170,7 +174,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v2.2</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v2.3</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -195,13 +199,13 @@
         </div>
 
         <div class="control-group">
-            <label>Avatar Frames</label>
+            <label>Avatar Images</label>
             <div class="grid grid-cols-2 gap-2">
                 <div class="file-btn" onclick="document.getElementById('input-idle').click()">
-                    <span id="label-idle">📂 Idle</span>
+                    <span id="label-idle">📂 Idle Frames</span>
                 </div>
                 <div class="file-btn" onclick="document.getElementById('input-talk').click()">
-                    <span id="label-talk">📂 Talking</span>
+                    <span id="label-talk">📂 Talk Frames</span>
                 </div>
             </div>
             <input type="file" id="input-idle" class="hidden" multiple accept="image/*">
@@ -209,19 +213,8 @@
         </div>
 
         <div class="control-group">
-            <label>Background</label>
-            <div class="flex items-center gap-2 mb-2">
-                <input type="color" id="bg-color-picker" value="#00b140" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0">
-                <div class="file-btn flex-1" onclick="document.getElementById('input-bg').click()">
-                    <span id="label-bg">🖼 Image</span>
-                </div>
-            </div>
-            <input type="file" id="input-bg" class="hidden" accept="image/*">
-        </div>
-
-        <div class="control-group">
             <label>Settings</label>
-            <div class="space-y-3">
+            <div class="space-y-4">
                 <div>
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
                         <span>Mic Sensitivity</span>
@@ -229,16 +222,39 @@
                     </div>
                     <input type="range" id="slider-threshold" min="1" max="100" value="15">
                 </div>
-                <div>
-                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
-                        <span>Bounce</span>
-                        <span>Animation Speed</span>
+                
+                <details>
+                    <summary class="flex justify-between items-center bg-gray-800 p-2 rounded">
+                        <span>🛠 Advanced Animation</span>
+                        <span class="text-[10px]">▼</span>
+                    </summary>
+                    <div class="pt-3 space-y-3 pl-1">
+                        <div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Idle Speed (Blink)</span>
+                                <span id="speed-idle-val">150ms</span>
+                            </div>
+                            <input type="range" id="slider-speed-idle" min="50" max="1000" step="10" value="150" dir="rtl">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Talk Speed (Mouth)</span>
+                                <span id="speed-talk-val">60ms</span>
+                            </div>
+                            <input type="range" id="slider-speed-talk" min="20" max="300" step="10" value="60" dir="rtl">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400">Randomize Talk Frames</span>
+                            <input type="checkbox" id="chk-random-talk" class="accent-purple-500" checked>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Bounce Physics</span>
+                            </div>
+                            <input type="range" id="slider-bounce" min="0" max="100" value="20">
+                        </div>
                     </div>
-                    <div class="flex gap-2">
-                        <input type="range" id="slider-bounce" min="0" max="100" value="20" class="flex-1">
-                        <input type="range" id="slider-speed" min="50" max="500" step="10" value="150" dir="rtl" class="flex-1">
-                    </div>
-                </div>
+                </details>
             </div>
         </div>
 
@@ -253,13 +269,22 @@
                 <input type="range" id="slider-zoom" min="100" max="150" value="110">
             </div>
         </div>
+
+        <div class="control-group">
+            <label>Background</label>
+            <div class="flex items-center gap-2">
+                <input type="color" id="bg-color-picker" value="#00b140" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0">
+                <div class="file-btn flex-1" onclick="document.getElementById('input-bg').click()">
+                    <span id="label-bg">🖼 Upload Image</span>
+                </div>
+            </div>
+            <input type="file" id="input-bg" class="hidden" accept="image/*">
+        </div>
     </div>
 
     <script>
-        // Security Warning
         if (window.location.protocol === 'file:') alert("⚠️ Local File Detected. Mic access requires 'localhost' or GitHub Pages.");
 
-        // --- GLOBAL STATE ---
         const state = {
             audioContext: null,
             analyser: null,
@@ -275,6 +300,7 @@
             volume: 0,
             enableSwear: false,
             enableShake: true,
+            randomTalk: true,
             isLocked: false
         };
 
@@ -289,74 +315,51 @@
             controls: document.getElementById('controls'),
             volMeter: document.getElementById('vol-meter'),
             
-            // Inputs
             threshold: document.getElementById('slider-threshold'),
             bounce: document.getElementById('slider-bounce'),
-            speed: document.getElementById('slider-speed'),
+            speedIdle: document.getElementById('slider-speed-idle'),
+            speedTalk: document.getElementById('slider-speed-talk'),
             zoom: document.getElementById('slider-zoom'),
             bgColor: document.getElementById('bg-color-picker'),
+            randomTalk: document.getElementById('chk-random-talk'),
             
-            // Buttons
             btnLock: document.getElementById('btn-lock')
         };
 
-        // --- INTERACTION SYSTEM (Drag & Resize) ---
+        // --- INTERACTION ---
         let dragTarget = null;
         let startX, startY, initialLeft, initialTop;
 
         function makeInteractive(el) {
-            // Drag Start
             el.addEventListener('mousedown', (e) => {
                 if (state.isLocked) return;
-                if (e.button !== 0) return; // Only Left Click
+                if (e.button !== 0) return;
                 e.preventDefault();
                 dragTarget = el;
-                
-                // Get current position (computed style or inline)
-                const rect = el.getBoundingClientRect();
-                // We operate on style.left/top relative to parent
-                // Ideally we store state, but reading style is robust for simple tool
                 startX = e.clientX;
                 startY = e.clientY;
-                
-                // If it's the first drag, transform might be percentage based. 
-                // We need to switch to pixel based or offset.
-                // Simplified: We rely on offsetLeft/Top if positioned absolute
                 initialLeft = el.offsetLeft;
                 initialTop = el.offsetTop;
             });
 
-            // Wheel Resize
             el.addEventListener('wheel', (e) => {
                 if (state.isLocked) return;
                 e.preventDefault();
-                
-                // Get current scale
-                // Note: avatar-wrapper starts with translate(-50%, -50%) scale(1)
-                // We need to parse the transform string or store scale in a data attribute
                 let currentScale = parseFloat(el.getAttribute('data-scale')) || 1;
-                
                 const delta = e.deltaY > 0 ? -0.05 : 0.05;
                 let newScale = Math.max(0.1, currentScale + delta);
-                
                 el.setAttribute('data-scale', newScale);
                 updateTransform(el);
             });
         }
 
-        // Global Drag Move
         window.addEventListener('mousemove', (e) => {
             if (!dragTarget || state.isLocked) return;
             e.preventDefault();
-            
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
-            
             dragTarget.style.left = `${initialLeft + dx}px`;
             dragTarget.style.top = `${initialTop + dy}px`;
-            
-            // Important: Remove the CSS centering translate if we are manually positioning
-            // We handle this in updateTransform
             dragTarget.setAttribute('data-dragged', 'true');
             updateTransform(dragTarget);
         });
@@ -365,21 +368,13 @@
 
         function updateTransform(el) {
             const scale = parseFloat(el.getAttribute('data-scale')) || 1;
-            // If dragged, we remove the translate(-50%, -50%) centering because we are setting specific top/left
             const isDragged = el.getAttribute('data-dragged') === 'true';
-            
-            if (isDragged) {
-                el.style.transform = `scale(${scale})`;
-            } else {
-                // Default centered state
-                el.style.transform = `translate(-50%, -50%) scale(${scale})`;
-            }
+            el.style.transform = isDragged ? `scale(${scale})` : `translate(-50%, -50%) scale(${scale})`;
         }
 
         makeInteractive(els.avatarWrapper);
         makeInteractive(els.bgWrapper);
 
-        // Lock Toggle
         els.btnLock.addEventListener('click', () => {
             state.isLocked = !state.isLocked;
             if (state.isLocked) {
@@ -439,7 +434,6 @@
                 els.volMeter.innerText = Math.floor(state.volume);
             }
 
-            // Logic
             const threshold = parseInt(els.threshold.value);
             const wasTalking = state.isTalking;
             state.isTalking = state.volume > threshold;
@@ -451,24 +445,39 @@
                 state.isBlinking = false;
             }
 
-            // Animation Frame
+            // Animation Frame Logic
             const now = Date.now();
-            const frameDuration = parseInt(els.speed.value);
-
+            
             if (state.isTalking) {
-                if (now - state.lastFrameTime > frameDuration) {
-                    state.currentFrameIndex = (state.currentFrameIndex + 1) % state.talkFrames.length;
+                // TALK Logic
+                const speed = parseInt(els.speedTalk.value);
+                if (now - state.lastFrameTime > speed) {
+                    if (state.randomTalk && state.talkFrames.length > 1) {
+                        // Random frame excluding current to force change
+                        let nextFrame;
+                        do {
+                            nextFrame = Math.floor(Math.random() * state.talkFrames.length);
+                        } while (nextFrame === state.currentFrameIndex && state.talkFrames.length > 1);
+                        state.currentFrameIndex = nextFrame;
+                    } else {
+                        // Sequential loop
+                        state.currentFrameIndex = (state.currentFrameIndex + 1) % state.talkFrames.length;
+                    }
+                    
                     if(state.talkFrames.length > 0) els.avatarImg.src = state.talkFrames[state.currentFrameIndex];
                     state.lastFrameTime = now;
                 }
             } else {
-                // Idle Blink Logic
+                // IDLE Logic (Blinking)
+                const speed = parseInt(els.speedIdle.value);
+                
                 if (!state.isBlinking && now > state.nextBlinkTime) {
                     state.isBlinking = true;
                     state.currentFrameIndex = 0; 
                 }
+                
                 if (state.isBlinking && state.idleFrames.length > 1) {
-                    if (now - state.lastFrameTime > frameDuration) {
+                    if (now - state.lastFrameTime > speed) {
                         state.currentFrameIndex++;
                         if (state.currentFrameIndex >= state.idleFrames.length) {
                             state.currentFrameIndex = 0;
@@ -483,7 +492,7 @@
                 }
             }
 
-            // Physics (Applied to INNER container #avatar-physics)
+            // Physics
             let scaleX = 1, scaleY = 1, translateY = 0, rotate = 0;
             const bounceFactor = parseInt(els.bounce.value) / 3000;
             
@@ -495,7 +504,6 @@
                 translateY = deformation * 10;
             }
 
-            // Shout Effects
             let zoomScale = 1;
             if (state.isShouting) {
                 zoomScale = parseInt(els.zoom.value) / 100;
@@ -511,18 +519,12 @@
                 } else els.swearLayer.style.opacity = 0;
             } else els.swearLayer.style.opacity = 0;
 
-            // Apply Transforms
-            // 1. Stage Zoom (Camera effect)
             els.stage.style.transform = `scale(${state.isShouting ? zoomScale : 1})`;
-            
-            // 2. Avatar Physics (Bounce/Squash)
             els.avatarPhysics.style.transform = `translate(0px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
-            
-            // 3. Brightness
             els.avatarImg.style.filter = (state.isShouting && state.volume > 90) ? "brightness(1.2)" : "brightness(1.0)";
         }
 
-        // --- File Handling ---
+        // --- FILE HANDLING ---
         function handleUpload(inputId, labelId, stateKey) {
             document.getElementById(inputId).addEventListener('change', function(e) {
                 const files = Array.from(e.target.files);
@@ -551,7 +553,6 @@
         handleUpload('input-idle', 'label-idle', 'idleFrames');
         handleUpload('input-talk', 'label-talk', 'talkFrames');
 
-        // Background Upload
         document.getElementById('input-bg').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -569,7 +570,6 @@
             els.stage.style.backgroundColor = e.target.value;
         });
 
-        // --- Particles ---
         function initSwearParticles() {
             const symbols = ['@', '#', '!', '%', '&', '$', '🤬', '💢'];
             for(let i=0; i<10; i++) {
@@ -584,19 +584,14 @@
             }
         }
 
-        // --- UI Hiding (Hotkey) ---
+        // Toggles & UI
         const toggleUI = () => {
             els.controls.classList.toggle('hidden');
             document.body.classList.toggle('show-hint');
         };
-        
         document.getElementById('btn-hide').addEventListener('click', toggleUI);
-        
-        window.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === 'h') toggleUI();
-        });
+        window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'h') toggleUI(); });
 
-        // Toggles
         ['btn-toggle-swear', 'btn-toggle-shake'].forEach(id => {
             document.getElementById(id).addEventListener('click', function() {
                 this.classList.toggle('active');
@@ -605,7 +600,9 @@
             });
         });
 
-        els.speed.addEventListener('input', (e) => document.getElementById('speed-val').innerText = e.target.value + 'ms');
+        els.randomTalk.addEventListener('change', (e) => state.randomTalk = e.target.checked);
+        els.speedIdle.addEventListener('input', (e) => document.getElementById('speed-idle-val').innerText = e.target.value + 'ms');
+        els.speedTalk.addEventListener('input', (e) => document.getElementById('speed-talk-val').innerText = e.target.value + 'ms');
 
     </script>
 </body>
