@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v3.1</title>
+    <title>Salamander WebTuber v3.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -125,7 +125,34 @@
         .control-group label { display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; color: #a5b4fc; letter-spacing: 0.05em; }
         
         input[type="range"] { width: 100%; accent-color: #a855f7; height: 4px; background: #4b5563; border-radius: 2px; }
-        input[type="text"] { @apply bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-purple-500 w-full; }
+        
+        /* FORCE VISIBILITY ON TEXT INPUTS */
+        input[type="text"] { 
+            background-color: #374151 !important; 
+            color: #ffffff !important; 
+            border: 1px solid #4b5563; 
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+        }
+        input[type="text"]:focus { border-color: #a855f7; }
+
+        /* FORCE VISIBILITY ON DROPDOWNS */
+        select { 
+            width: 100%;
+            background-color: #ffffff !important; 
+            color: #000000 !important; 
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px;
+            font-size: 12px;
+            margin-bottom: 8px;
+            outline: none;
+        }
+        select:focus { border-color: #a855f7; }
+        select option { background-color: #ffffff; color: #000000; }
         
         .file-btn {
             background: rgba(255,255,255,0.05); border: 1px dashed #6b7280;
@@ -153,11 +180,19 @@
         details summary:hover { color: #fff; }
         details[open] summary { margin-bottom: 10px; }
         
-        select { @apply w-full bg-gray-800 text-xs text-white border border-gray-600 rounded p-1 mb-2 outline-none focus:border-purple-500; }
-        select option { background-color: #000000; color: white; }
-        
-        .key-bind-input { @apply w-8 text-center uppercase cursor-pointer bg-gray-700 text-white hover:bg-gray-600 rounded border border-gray-600 text-xs py-1; }
-        .key-bind-input:focus { @apply border-purple-500 bg-purple-900/50; }
+        .key-bind-input { 
+            width: 32px;
+            text-align: center;
+            text-transform: uppercase;
+            cursor: pointer;
+            background-color: #374151 !important; 
+            color: white !important; 
+            border: 1px solid #4b5563;
+            border-radius: 4px;
+            font-size: 12px;
+            padding: 2px 0;
+        }
+        .key-bind-input:focus { border-color: #a855f7; background-color: #4c1d95 !important; }
     </style>
 </head>
 <body class="show-hint">
@@ -181,7 +216,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v3.1</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v3.3</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -414,8 +449,6 @@
         };
 
         // --- INPUT CONFIGURATION ---
-        
-        // 1. Keyboard Rebind Logic
         function setupKeyBinders() {
             [1,2,3,4].forEach(id => {
                 const input = document.getElementById(`bind-${id}`);
@@ -430,7 +463,6 @@
         }
         setupKeyBinders();
 
-        // 2. Chat Command Logic (Listener in Comfy Init)
         function updateChatCmds() {
             [1,2,3,4].forEach(id => {
                 const val = document.getElementById(`cmd-${id}`).value.trim().toLowerCase();
@@ -888,7 +920,8 @@
             document.body.classList.toggle('show-hint');
         };
         document.getElementById('btn-hide').addEventListener('click', toggleUI);
-        
+        window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'h') toggleUI(); });
+
         ['btn-toggle-swear', 'btn-toggle-shake'].forEach(id => {
             document.getElementById(id).addEventListener('click', function() {
                 this.classList.toggle('active');
