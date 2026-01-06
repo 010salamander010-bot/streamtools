@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v3.3</title>
+    <title>Salamander WebTuber v3.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -216,20 +216,22 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v3.3</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v3.4</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
         <!-- Profile Manager -->
         <div class="control-group">
-            <label>Profile Manager</label>
+            <label>Data Management</label>
+            <div class="text-[10px] text-gray-400 mb-2">Settings auto-save to browser storage.</div>
             <div class="flex gap-2">
-                <button onclick="saveProfile()" class="flex-1 bg-green-700 hover:bg-green-600 text-white text-xs py-2 rounded">💾 Save JSON</button>
+                <button onclick="exportProfile()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded">⬇ Export Backup</button>
                 <div class="flex-1 relative">
-                    <button class="w-full bg-blue-700 hover:bg-blue-600 text-white text-xs py-2 rounded" onclick="document.getElementById('input-load').click()">📂 Load JSON</button>
+                    <button class="w-full bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded" onclick="document.getElementById('input-load').click()">⬆ Import Backup</button>
                     <input type="file" id="input-load" class="hidden" accept=".json">
                 </div>
             </div>
+            <button onclick="resetData()" class="w-full mt-2 bg-red-900/50 hover:bg-red-800 text-red-200 text-xs py-1 rounded border border-red-800">⚠ Wipe Data / Reset</button>
         </div>
 
         <!-- Audio Setup -->
@@ -448,16 +450,122 @@
             twitchStatus: document.getElementById('twitch-status')
         };
 
+        // --- CORE FUNCTIONS FOR AUTO-SAVE ---
+        
+        function getExportData() {
+            return {
+                modes: state.modes,
+                hotkeys: state.hotkeys,
+                chatCmds: state.chatCmds,
+                settings: {
+                    threshold: els.threshold.value,
+                    bounce: els.bounce.value,
+                    speedIdle: els.speedIdle.value,
+                    speedTalk: els.speedTalk.value,
+                    zoom: els.zoom.value,
+                    enableSwear: state.enableSwear,
+                    enableShake: state.enableShake,
+                    randomTalk: state.randomTalk,
+                    bgColor: els.bgColor.value,
+                    twitchChannel: els.twitchChannel.value
+                },
+                layout: {
+                    avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
+                    bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src }
+                }
+            };
+        }
+
+        function applyProfileData(data) {
+            if(data.modes) state.modes = data.modes;
+            if(data.hotkeys) {
+                state.hotkeys = data.hotkeys;
+                [1,2,3,4].forEach(id => {
+                    document.getElementById(`bind-${id}`).value = state.hotkeys[id].replace('Digit','').replace('Key','');
+                    document.getElementById(`badge-${id}`).innerText = document.getElementById(`bind-${id}`).value.substring(0,3);
+                });
+            }
+            if(data.chatCmds) {
+                state.chatCmds = data.chatCmds;
+                [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).value = state.chatCmds[id]);
+            }
+            if(data.settings) {
+                els.threshold.value = data.settings.threshold || 15;
+                els.bounce.value = data.settings.bounce || 20;
+                els.speedIdle.value = data.settings.speedIdle || 150;
+                els.speedTalk.value = data.settings.speedTalk || 60;
+                els.zoom.value = data.settings.zoom || 110;
+                els.bgColor.value = data.settings.bgColor || '#00b140';
+                els.stage.style.backgroundColor = els.bgColor.value;
+                els.twitchChannel.value = data.settings.twitchChannel || '';
+                
+                state.enableSwear = data.settings.enableSwear;
+                state.enableShake = data.settings.enableShake;
+                state.randomTalk = data.settings.randomTalk;
+                
+                document.getElementById('btn-toggle-swear').classList.toggle('active', state.enableSwear);
+                document.getElementById('btn-toggle-shake').classList.toggle('active', state.enableShake);
+                els.randomTalk.checked = state.randomTalk;
+            }
+            if(data.layout) {
+                if(data.layout.avatar) {
+                    els.avatarWrapper.style.cssText = data.layout.avatar.style;
+                    els.avatarWrapper.setAttribute('data-scale', data.layout.avatar.scale || 1);
+                }
+                if(data.layout.bg) {
+                    els.bgWrapper.style.cssText = data.layout.bg.style;
+                    els.bgWrapper.setAttribute('data-scale', data.layout.bg.scale || 1);
+                    if(data.layout.bg.src && data.layout.bg.src.length > 100) {
+                        els.bgImg.src = data.layout.bg.src;
+                        els.bgImg.style.display = 'block';
+                    }
+                }
+            }
+            setMode(1);
+        }
+
+        // --- AUTO SAVE LOGIC ---
+        function saveAuto() {
+            try {
+                const data = getExportData();
+                localStorage.setItem('webTuber_profile', JSON.stringify(data));
+                console.log("Auto-saved");
+            } catch (e) {
+                console.warn("Auto-save quota exceeded or error", e);
+            }
+        }
+
+        function loadAuto() {
+            const json = localStorage.getItem('webTuber_profile');
+            if (json) {
+                try {
+                    const data = JSON.parse(json);
+                    applyProfileData(data);
+                    console.log("Auto-loaded");
+                } catch (e) {
+                    console.error("Auto-load failed", e);
+                }
+            }
+        }
+
+        window.resetData = () => {
+            if(confirm("⚠ This will WIPE all your saved images and settings. Are you sure?")) {
+                localStorage.removeItem('webTuber_profile');
+                location.reload();
+            }
+        };
+
         // --- INPUT CONFIGURATION ---
         function setupKeyBinders() {
             [1,2,3,4].forEach(id => {
                 const input = document.getElementById(`bind-${id}`);
                 input.addEventListener('keydown', (e) => {
                     e.preventDefault();
-                    state.hotkeys[id] = e.code; // Store KeyCode (e.g., 'Numpad1')
-                    input.value = e.code.replace('Digit','').replace('Key',''); // Display friendly name
-                    document.getElementById(`badge-${id}`).innerText = input.value.substring(0,3); // Update Badge
+                    state.hotkeys[id] = e.code; 
+                    input.value = e.code.replace('Digit','').replace('Key',''); 
+                    document.getElementById(`badge-${id}`).innerText = input.value.substring(0,3); 
                     input.blur();
+                    saveAuto(); // Auto save
                 });
             });
         }
@@ -468,6 +576,7 @@
                 const val = document.getElementById(`cmd-${id}`).value.trim().toLowerCase();
                 if(val) state.chatCmds[id] = val;
             });
+            saveAuto(); // Auto save
         }
         [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).addEventListener('input', updateChatCmds));
 
@@ -517,6 +626,7 @@
             ComfyJS.onConnected = () => {
                 els.twitchStatus.innerText = "✅ Connected to " + channel;
                 els.twitchStatus.classList.add('text-green-400');
+                saveAuto(); // Save valid channel
             };
 
             ComfyJS.Init(channel);
@@ -536,29 +646,9 @@
             if (e.key.toLowerCase() === 'h') toggleUI();
         });
 
-        // --- SAVE / LOAD SYSTEM ---
-        window.saveProfile = () => {
-            const exportData = {
-                modes: state.modes,
-                hotkeys: state.hotkeys,
-                chatCmds: state.chatCmds,
-                settings: {
-                    threshold: els.threshold.value,
-                    bounce: els.bounce.value,
-                    speedIdle: els.speedIdle.value,
-                    speedTalk: els.speedTalk.value,
-                    zoom: els.zoom.value,
-                    enableSwear: state.enableSwear,
-                    enableShake: state.enableShake,
-                    randomTalk: state.randomTalk,
-                    bgColor: els.bgColor.value,
-                    twitchChannel: els.twitchChannel.value
-                },
-                layout: {
-                    avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
-                    bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src }
-                }
-            };
+        // --- EXPORT / IMPORT ---
+        window.exportProfile = () => {
+            const exportData = getExportData();
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
             const node = document.createElement('a');
             node.setAttribute("href", dataStr);
@@ -575,51 +665,8 @@
             r.onload = (ev) => {
                 try {
                     const data = JSON.parse(ev.target.result);
-                    if(data.modes) state.modes = data.modes;
-                    if(data.hotkeys) {
-                        state.hotkeys = data.hotkeys;
-                        [1,2,3,4].forEach(id => {
-                            document.getElementById(`bind-${id}`).value = state.hotkeys[id].replace('Digit','').replace('Key','');
-                            document.getElementById(`badge-${id}`).innerText = document.getElementById(`bind-${id}`).value.substring(0,3);
-                        });
-                    }
-                    if(data.chatCmds) {
-                        state.chatCmds = data.chatCmds;
-                        [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).value = state.chatCmds[id]);
-                    }
-                    if(data.settings) {
-                        els.threshold.value = data.settings.threshold || 15;
-                        els.bounce.value = data.settings.bounce || 20;
-                        els.speedIdle.value = data.settings.speedIdle || 150;
-                        els.speedTalk.value = data.settings.speedTalk || 60;
-                        els.zoom.value = data.settings.zoom || 110;
-                        els.bgColor.value = data.settings.bgColor || '#00b140';
-                        els.stage.style.backgroundColor = els.bgColor.value;
-                        els.twitchChannel.value = data.settings.twitchChannel || '';
-                        
-                        state.enableSwear = data.settings.enableSwear;
-                        state.enableShake = data.settings.enableShake;
-                        state.randomTalk = data.settings.randomTalk;
-                        
-                        document.getElementById('btn-toggle-swear').classList.toggle('active', state.enableSwear);
-                        document.getElementById('btn-toggle-shake').classList.toggle('active', state.enableShake);
-                        els.randomTalk.checked = state.randomTalk;
-                    }
-                    if(data.layout) {
-                        if(data.layout.avatar) {
-                            els.avatarWrapper.style.cssText = data.layout.avatar.style;
-                            els.avatarWrapper.setAttribute('data-scale', data.layout.avatar.scale || 1);
-                        }
-                        if(data.layout.bg) {
-                            els.bgWrapper.style.cssText = data.layout.bg.style;
-                            els.bgWrapper.setAttribute('data-scale', data.layout.bg.scale || 1);
-                            if(data.layout.bg.src && data.layout.bg.src.length > 100) {
-                                els.bgImg.src = data.layout.bg.src;
-                                els.bgImg.style.display = 'block';
-                            }
-                        }
-                    }
-                    setMode(1);
+                    applyProfileData(data);
+                    saveAuto(); // Persist imported data
                     alert("✅ Profile Loaded!");
                 } catch(err) { alert("Error loading profile"); }
             };
@@ -650,6 +697,7 @@
                 let newScale = Math.max(0.1, currentScale + delta);
                 el.setAttribute('data-scale', newScale);
                 updateTransform(el);
+                saveAuto(); // Save resize
             });
         }
 
@@ -664,7 +712,12 @@
             updateTransform(dragTarget);
         });
 
-        window.addEventListener('mouseup', () => { dragTarget = null; });
+        window.addEventListener('mouseup', () => { 
+            if(dragTarget) {
+                dragTarget = null;
+                saveAuto(); // Save position after drag
+            }
+        });
 
         function updateTransform(el) {
             const scale = parseFloat(el.getAttribute('data-scale')) || 1;
@@ -700,6 +753,7 @@
                     el.setAttribute('data-dragged', 'false');
                     el.style.transform = `translate(-50%, -50%) scale(1)`;
                 });
+                saveAuto();
             }
         };
 
@@ -759,6 +813,8 @@
 
         document.getElementById('btn-start').addEventListener('click', startMicrophone);
         window.addEventListener('load', async () => {
+            // LOAD AUTO SAVE ON START
+            loadAuto();
             if (localStorage.getItem('webTuber_micPermission') === 'true') startMicrophone();
         });
 
@@ -873,6 +929,7 @@
                                 document.getElementById(labelId).innerText = `✅ ${files.length} Frames`;
                                 document.getElementById(labelId).parentElement.classList.add('border-green-500', 'text-green-400');
                                 if(type === 'idle') els.avatarImg.src = loadedFrames[0];
+                                saveAuto(); // Save new images
                             }
                         };
                         reader.readAsDataURL(file);
@@ -892,6 +949,7 @@
                     els.bgImg.src = ev.target.result;
                     els.bgImg.style.display = 'block';
                     document.getElementById('label-bg').innerText = "✅ Loaded";
+                    saveAuto(); // Save new BG
                 };
                 reader.readAsDataURL(file);
             }
@@ -899,6 +957,7 @@
 
         document.getElementById('bg-color-picker').addEventListener('input', (e) => {
             els.stage.style.backgroundColor = e.target.value;
+            saveAuto(); // Save color
         });
 
         function initSwearParticles() {
@@ -927,10 +986,20 @@
                 this.classList.toggle('active');
                 if(id.includes('swear')) state.enableSwear = !state.enableSwear;
                 if(id.includes('shake')) state.enableShake = !state.enableShake;
+                saveAuto(); // Save settings
             });
         });
 
-        els.randomTalk.addEventListener('change', (e) => state.randomTalk = e.target.checked);
+        els.randomTalk.addEventListener('change', (e) => {
+            state.randomTalk = e.target.checked;
+            saveAuto();
+        });
+        
+        // Settings listeners for Auto Save
+        [els.threshold, els.bounce, els.speedIdle, els.speedTalk, els.zoom].forEach(el => {
+            el.addEventListener('change', saveAuto);
+        });
+        
         els.speedIdle.addEventListener('input', (e) => document.getElementById('speed-idle-val').innerText = e.target.value + 'ms');
         els.speedTalk.addEventListener('input', (e) => document.getElementById('speed-talk-val').innerText = e.target.value + 'ms');
 
