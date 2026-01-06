@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v3.4</title>
+    <title>Salamander WebTuber v4.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -36,19 +36,17 @@
         .interactive-layer:active { cursor: grabbing; }
         .interactive-layer.locked { cursor: default; pointer-events: none; }
 
-        /* Background specific */
+        /* Z-INDEX ORDERING IS CRITICAL HERE */
+        
+        /* 1. Background (Bottom) */
         #bg-wrapper {
             top: 50%; left: 50%;
             width: 100vw; height: 100vh;
             z-index: 0;
         }
-        #bg-img {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            pointer-events: none;
-        }
+        #bg-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 
-        /* Avatar specific */
+        /* 2. Avatar (Middle) */
         #avatar-wrapper {
             top: 50%; left: 50%;
             width: 400px; height: 400px;
@@ -56,7 +54,7 @@
             transform: translate(-50%, -50%) scale(1); 
         }
 
-        /* The Physics Container (Inside wrapper) */
+        /* Physics Container inside Avatar Wrapper */
         #avatar-physics {
             width: 100%;
             height: 100%;
@@ -64,8 +62,9 @@
             justify-content: center;
             align-items: flex-end;
             transform-origin: bottom center;
-            pointer-events: none;
+            pointer-events: none; /* Pass drag events to wrapper or pinned items */
             transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
         }
 
         #avatar-img {
@@ -75,6 +74,26 @@
             pointer-events: none;
             transition: filter 0.1s;
         }
+
+        /* 3. Pinned Props (Attached to Avatar Physics) */
+        /* These live INSIDE #avatar-physics so they bounce */
+        .prop-pinned {
+            z-index: 15;
+            /* Default center */
+            top: 20%; left: 50%; 
+            width: 150px; height: 150px;
+        }
+        .prop-pinned img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+        /* 4. Static Props (Foreground / Desk) */
+        /* These live OUTSIDE physics, sitting in front */
+        #prop-static-wrapper {
+            top: 80%; left: 50%;
+            width: 600px; height: 300px;
+            z-index: 30;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #prop-static-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
         /* Swear Symbols */
         .swear-symbol {
@@ -126,7 +145,7 @@
         
         input[type="range"] { width: 100%; accent-color: #a855f7; height: 4px; background: #4b5563; border-radius: 2px; }
         
-        /* FORCE VISIBILITY ON TEXT INPUTS */
+        /* FORCE VISIBILITY */
         input[type="text"] { 
             background-color: #374151 !important; 
             color: #ffffff !important; 
@@ -139,7 +158,6 @@
         }
         input[type="text"]:focus { border-color: #a855f7; }
 
-        /* FORCE VISIBILITY ON DROPDOWNS */
         select { 
             width: 100%;
             background-color: #ffffff !important; 
@@ -163,7 +181,6 @@
         .toggle-btn { @apply text-xs py-1 px-3 rounded border border-gray-600 bg-gray-800 text-gray-300 transition hover:bg-gray-700 cursor-pointer; }
         .toggle-btn.active { @apply bg-purple-600 border-purple-500 text-white; }
 
-        /* Mode Buttons */
         .mode-btn { @apply flex-1 py-2 text-center text-xs font-bold rounded border border-gray-600 bg-gray-800 text-gray-400 transition cursor-pointer hover:bg-gray-700 relative overflow-hidden; }
         .mode-btn.active { @apply bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/50; }
         .key-badge { @apply absolute top-0 right-0 bg-gray-900 text-[9px] px-1 text-gray-400 rounded-bl opacity-70; }
@@ -199,15 +216,32 @@
 
     <!-- The Stage -->
     <div id="stage">
+        
+        <!-- 1. Background -->
         <div id="bg-wrapper" class="interactive-layer">
             <img id="bg-img" src="" style="display:none;">
         </div>
+
+        <!-- 2. Avatar Group -->
         <div id="avatar-wrapper" class="interactive-layer">
+            <!-- Physics Container (Bounces/Squashes) -->
             <div id="avatar-physics">
                 <img id="avatar-img" src="https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png">
+                
+                <!-- Pinned Prop (Moves WITH Physics) -->
+                <div id="prop-pinned-wrapper" class="interactive-layer prop-pinned" style="display:none;">
+                    <img id="prop-pinned-img" src="">
+                </div>
+
                 <div id="swear-layer" class="absolute inset-0 pointer-events-none"></div>
             </div>
         </div>
+
+        <!-- 3. Static Prop (Foreground - No Physics) -->
+        <div id="prop-static-wrapper" class="interactive-layer" style="display:none;">
+            <img id="prop-static-img" src="">
+        </div>
+
     </div>
 
     <!-- Hint -->
@@ -216,7 +250,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v3.4</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.0</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -269,6 +303,24 @@
             </div>
             <input type="file" id="input-idle" class="hidden" multiple accept="image/*">
             <input type="file" id="input-talk" class="hidden" multiple accept="image/*">
+        </div>
+
+        <!-- NEW: PROPS SYSTEM -->
+        <div class="control-group">
+            <label>Props & Layers</label>
+            <div class="grid grid-cols-2 gap-2">
+                <div class="file-btn" onclick="document.getElementById('input-prop-pinned').click()">
+                    <span id="label-prop-pinned">🎩 Pinned (Hat)</span>
+                </div>
+                <div class="file-btn" onclick="document.getElementById('input-prop-static').click()">
+                    <span id="label-prop-static">🎤 Static (Desk)</span>
+                </div>
+            </div>
+            <div class="text-[10px] text-gray-500 mt-1">
+                <b>Pinned:</b> Bounces with you. <b>Static:</b> Stays in foreground.
+            </div>
+            <input type="file" id="input-prop-pinned" class="hidden" accept="image/*">
+            <input type="file" id="input-prop-static" class="hidden" accept="image/*">
         </div>
 
         <!-- Input & Integration Settings -->
@@ -406,10 +458,7 @@
                 3: { name: 'Angry', idle: [], talk: [] },
                 4: { name: 'Sad', idle: [], talk: [] }
             },
-            
-            // Key Bindings (Codes)
             hotkeys: { 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', 4: 'Digit4' },
-            // Chat Commands
             chatCmds: { 1: '!normal', 2: '!happy', 3: '!angry', 4: '!sad' },
             
             isTalking: false,
@@ -424,7 +473,13 @@
             randomTalk: true,
             isLocked: false,
             
-            layout: { avatar: { x: 0, y: 0, scale: 1 }, bg: { x: 0, y: 0, scale: 1 } }
+            // Layout (Now includes props)
+            layout: { 
+                avatar: { x: 0, y: 0, scale: 1 }, 
+                bg: { x: 0, y: 0, scale: 1 },
+                propStatic: { x: 0, y: 0, scale: 1 },
+                propPinned: { x: 0, y: 0, scale: 1 }
+            }
         };
 
         const els = {
@@ -434,9 +489,15 @@
             avatarImg: document.getElementById('avatar-img'),
             bgWrapper: document.getElementById('bg-wrapper'),
             bgImg: document.getElementById('bg-img'),
+            propStaticWrapper: document.getElementById('prop-static-wrapper'),
+            propStaticImg: document.getElementById('prop-static-img'),
+            propPinnedWrapper: document.getElementById('prop-pinned-wrapper'),
+            propPinnedImg: document.getElementById('prop-pinned-img'),
+            
             swearLayer: document.getElementById('swear-layer'),
             controls: document.getElementById('controls'),
             volMeter: document.getElementById('vol-meter'),
+            
             threshold: document.getElementById('slider-threshold'),
             bounce: document.getElementById('slider-bounce'),
             speedIdle: document.getElementById('slider-speed-idle'),
@@ -471,7 +532,10 @@
                 },
                 layout: {
                     avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
-                    bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src }
+                    bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src },
+                    // Save Props
+                    propStatic: { style: els.propStaticWrapper.style.cssText, scale: els.propStaticWrapper.getAttribute('data-scale'), src: els.propStaticImg.src },
+                    propPinned: { style: els.propPinnedWrapper.style.cssText, scale: els.propPinnedWrapper.getAttribute('data-scale'), src: els.propPinnedImg.src }
                 }
             };
         }
@@ -508,18 +572,21 @@
                 els.randomTalk.checked = state.randomTalk;
             }
             if(data.layout) {
-                if(data.layout.avatar) {
-                    els.avatarWrapper.style.cssText = data.layout.avatar.style;
-                    els.avatarWrapper.setAttribute('data-scale', data.layout.avatar.scale || 1);
-                }
-                if(data.layout.bg) {
-                    els.bgWrapper.style.cssText = data.layout.bg.style;
-                    els.bgWrapper.setAttribute('data-scale', data.layout.bg.scale || 1);
-                    if(data.layout.bg.src && data.layout.bg.src.length > 100) {
-                        els.bgImg.src = data.layout.bg.src;
-                        els.bgImg.style.display = 'block';
+                const applyLayout = (el, cfg, imgEl) => {
+                    if(!cfg) return;
+                    el.style.cssText = cfg.style;
+                    el.setAttribute('data-scale', cfg.scale || 1);
+                    if(imgEl && cfg.src && cfg.src.length > 100) {
+                        imgEl.src = cfg.src;
+                        imgEl.style.display = 'block'; // Make visible if src exists
+                        if(el.style.display === 'none') el.style.display = 'flex';
                     }
-                }
+                };
+                
+                applyLayout(els.avatarWrapper, data.layout.avatar);
+                applyLayout(els.bgWrapper, data.layout.bg, els.bgImg);
+                applyLayout(els.propStaticWrapper, data.layout.propStatic, els.propStaticImg);
+                applyLayout(els.propPinnedWrapper, data.layout.propPinned, els.propPinnedImg);
             }
             setMode(1);
         }
@@ -529,7 +596,6 @@
             try {
                 const data = getExportData();
                 localStorage.setItem('webTuber_profile', JSON.stringify(data));
-                console.log("Auto-saved");
             } catch (e) {
                 console.warn("Auto-save quota exceeded or error", e);
             }
@@ -541,7 +607,6 @@
                 try {
                     const data = JSON.parse(json);
                     applyProfileData(data);
-                    console.log("Auto-loaded");
                 } catch (e) {
                     console.error("Auto-load failed", e);
                 }
@@ -565,7 +630,7 @@
                     input.value = e.code.replace('Digit','').replace('Key',''); 
                     document.getElementById(`badge-${id}`).innerText = input.value.substring(0,3); 
                     input.blur();
-                    saveAuto(); // Auto save
+                    saveAuto(); 
                 });
             });
         }
@@ -576,7 +641,7 @@
                 const val = document.getElementById(`cmd-${id}`).value.trim().toLowerCase();
                 if(val) state.chatCmds[id] = val;
             });
-            saveAuto(); // Auto save
+            saveAuto();
         }
         [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).addEventListener('input', updateChatCmds));
 
@@ -607,16 +672,13 @@
             const channel = els.twitchChannel.value.trim();
             if(!channel) return alert("Enter a channel name!");
             
-            // Disconnect first
             try { ComfyJS.Disconnect(); } catch(e){}
 
             ComfyJS.onCommand = (user, command, message, flags, extra) => {
                 const fullCmd = "!" + command.toLowerCase();
-                // Check if command matches any mode
                 for (const [modeId, trigger] of Object.entries(state.chatCmds)) {
                     if (trigger === fullCmd) {
                         setMode(parseInt(modeId));
-                        // Visual feedback flash
                         document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
                         setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
                     }
@@ -626,22 +688,16 @@
             ComfyJS.onConnected = () => {
                 els.twitchStatus.innerText = "✅ Connected to " + channel;
                 els.twitchStatus.classList.add('text-green-400');
-                saveAuto(); // Save valid channel
+                saveAuto();
             };
 
             ComfyJS.Init(channel);
         });
 
-        // --- KEYBOARD LISTENER ---
         window.addEventListener('keydown', (e) => {
-            // Don't trigger if typing in an input field
             if (e.target.tagName === 'INPUT') return;
-
-            // Check custom hotkeys
             for (const [modeId, keyCode] of Object.entries(state.hotkeys)) {
-                if (e.code === keyCode) {
-                    setMode(parseInt(modeId));
-                }
+                if (e.code === keyCode) setMode(parseInt(modeId));
             }
             if (e.key.toLowerCase() === 'h') toggleUI();
         });
@@ -666,7 +722,7 @@
                 try {
                     const data = JSON.parse(ev.target.result);
                     applyProfileData(data);
-                    saveAuto(); // Persist imported data
+                    saveAuto();
                     alert("✅ Profile Loaded!");
                 } catch(err) { alert("Error loading profile"); }
             };
@@ -697,7 +753,7 @@
                 let newScale = Math.max(0.1, currentScale + delta);
                 el.setAttribute('data-scale', newScale);
                 updateTransform(el);
-                saveAuto(); // Save resize
+                saveAuto();
             });
         }
 
@@ -715,7 +771,7 @@
         window.addEventListener('mouseup', () => { 
             if(dragTarget) {
                 dragTarget = null;
-                saveAuto(); // Save position after drag
+                saveAuto(); 
             }
         });
 
@@ -727,25 +783,25 @@
 
         makeInteractive(els.avatarWrapper);
         makeInteractive(els.bgWrapper);
+        makeInteractive(els.propStaticWrapper);
+        makeInteractive(els.propPinnedWrapper);
 
         els.btnLock.addEventListener('click', () => {
             state.isLocked = !state.isLocked;
             if (state.isLocked) {
                 els.btnLock.innerHTML = "<span>🔒</span> Locked";
                 els.btnLock.classList.add('bg-red-900', 'border-red-700', 'text-red-200');
-                els.avatarWrapper.classList.add('locked');
-                els.bgWrapper.classList.add('locked');
+                document.querySelectorAll('.interactive-layer').forEach(el => el.classList.add('locked'));
             } else {
                 els.btnLock.innerHTML = "<span>🔓</span> Unlocked";
                 els.btnLock.className = "toggle-btn w-full flex justify-center items-center gap-2";
-                els.avatarWrapper.classList.remove('locked');
-                els.bgWrapper.classList.remove('locked');
+                document.querySelectorAll('.interactive-layer').forEach(el => el.classList.remove('locked'));
             }
         });
 
         window.resetLayout = () => {
             if(confirm("Reset positions?")) {
-                ['avatarWrapper', 'bgWrapper'].forEach(key => {
+                ['avatarWrapper', 'bgWrapper', 'propStaticWrapper', 'propPinnedWrapper'].forEach(key => {
                     const el = els[key];
                     el.style.left = '50%';
                     el.style.top = '50%';
@@ -813,7 +869,6 @@
 
         document.getElementById('btn-start').addEventListener('click', startMicrophone);
         window.addEventListener('load', async () => {
-            // LOAD AUTO SAVE ON START
             loadAuto();
             if (localStorage.getItem('webTuber_micPermission') === 'true') startMicrophone();
         });
@@ -929,7 +984,7 @@
                                 document.getElementById(labelId).innerText = `✅ ${files.length} Frames`;
                                 document.getElementById(labelId).parentElement.classList.add('border-green-500', 'text-green-400');
                                 if(type === 'idle') els.avatarImg.src = loadedFrames[0];
-                                saveAuto(); // Save new images
+                                saveAuto();
                             }
                         };
                         reader.readAsDataURL(file);
@@ -941,6 +996,26 @@
         handleUpload('input-idle', 'label-idle', 'idle');
         handleUpload('input-talk', 'label-talk', 'talk');
 
+        // Props Upload Handlers
+        const handlePropUpload = (inputId, labelId, wrapperId, imgId, stateKey) => {
+            document.getElementById(inputId).addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        document.getElementById(imgId).src = ev.target.result;
+                        document.getElementById(wrapperId).style.display = 'flex';
+                        document.getElementById(labelId).innerText = "✅ Loaded";
+                        saveAuto();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        };
+
+        handlePropUpload('input-prop-static', 'label-prop-static', 'prop-static-wrapper', 'prop-static-img', 'propStatic');
+        handlePropUpload('input-prop-pinned', 'label-prop-pinned', 'prop-pinned-wrapper', 'prop-pinned-img', 'propPinned');
+
         document.getElementById('input-bg').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -949,7 +1024,7 @@
                     els.bgImg.src = ev.target.result;
                     els.bgImg.style.display = 'block';
                     document.getElementById('label-bg').innerText = "✅ Loaded";
-                    saveAuto(); // Save new BG
+                    saveAuto(); 
                 };
                 reader.readAsDataURL(file);
             }
@@ -957,7 +1032,7 @@
 
         document.getElementById('bg-color-picker').addEventListener('input', (e) => {
             els.stage.style.backgroundColor = e.target.value;
-            saveAuto(); // Save color
+            saveAuto();
         });
 
         function initSwearParticles() {
@@ -986,7 +1061,7 @@
                 this.classList.toggle('active');
                 if(id.includes('swear')) state.enableSwear = !state.enableSwear;
                 if(id.includes('shake')) state.enableShake = !state.enableShake;
-                saveAuto(); // Save settings
+                saveAuto(); 
             });
         });
 
@@ -995,7 +1070,6 @@
             saveAuto();
         });
         
-        // Settings listeners for Auto Save
         [els.threshold, els.bounce, els.speedIdle, els.speedTalk, els.zoom].forEach(el => {
             el.addEventListener('change', saveAuto);
         });
