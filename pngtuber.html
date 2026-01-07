@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.5</title>
+    <title>Salamander WebTuber v4.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -362,7 +362,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.5</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.6</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -503,6 +503,13 @@
                             </div>
                             <input type="file" id="input-bonk-img" class="hidden" accept="image/*">
                             <input type="file" id="input-bonk-sfx" class="hidden" accept="audio/*">
+                            
+                            <!-- Dizzy (Bonk Effect) -->
+                            <div class="mb-2 grid grid-cols-[1fr_auto] gap-1">
+                                <div class="text-[10px] text-gray-400 flex items-center">💫 Dizzy Particle</div>
+                                <div class="file-btn px-2" onclick="document.getElementById('input-dizzy-img').click()" title="Img">🖼</div>
+                            </div>
+                            <input type="file" id="input-dizzy-img" class="hidden" accept="image/*">
 
                             <!-- Throw -->
                             <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
@@ -635,6 +642,7 @@
             throw: { cmd: '!throw', img: 'https://cdn3.emoji.gg/emojis/6429-yeet.png' },
             pat: { cmd: '!pat', img: 'https://cdn3.emoji.gg/emojis/1376-pat.png' },
             cheer: { cmd: '!cheer' },
+            dizzy: { img: 'https://cdn3.emoji.gg/emojis/5684-star.png' }, // New Dizzy particle state
             
             isSquashed: false,
             isJumping: false,
@@ -696,17 +704,17 @@
         };
 
         // --- INIT STARS ---
-        function initDizzyStars() {
+        function updateDizzyParticles() {
             els.dizzyStars.innerHTML = '';
             for(let i=0; i<5; i++) {
                 const img = document.createElement('img');
-                img.src = 'https://cdn3.emoji.gg/emojis/5684-star.png';
+                img.src = state.dizzy.img;
                 img.className = 'star';
                 img.style.animationDelay = `${i * -0.2}s`;
                 els.dizzyStars.appendChild(img);
             }
         }
-        initDizzyStars();
+        updateDizzyParticles();
 
         // --- CORE FUNCTIONS FOR AUTO-SAVE ---
         function getExportData() {
@@ -714,7 +722,7 @@
                 modes: state.modes,
                 hotkeys: state.hotkeys,
                 chatCmds: state.chatCmds,
-                interactions: { bonk: state.bonk, throw: state.throw, pat: state.pat, cheer: state.cheer },
+                interactions: { bonk: state.bonk, throw: state.throw, pat: state.pat, cheer: state.cheer, dizzy: state.dizzy },
                 settings: {
                     threshold: els.threshold.value,
                     bounce: els.bounce.value,
@@ -748,7 +756,8 @@
                 state.throw = data.interactions.throw || state.throw;
                 state.pat = data.interactions.pat || state.pat;
                 state.cheer = data.interactions.cheer || state.cheer;
-                
+                state.dizzy = data.interactions.dizzy || state.dizzy;
+
                 document.getElementById('cmd-bonk').value = state.bonk.cmd;
                 document.getElementById('cmd-throw').value = state.throw.cmd;
                 document.getElementById('cmd-pat').value = state.pat.cmd;
@@ -757,6 +766,8 @@
                 els.bonkItem.src = state.bonk.img;
                 els.throwItem.src = state.throw.img;
                 els.patHand.src = state.pat.img;
+                
+                updateDizzyParticles();
             }
             if(data.settings) {
                 els.threshold.value = data.settings.threshold || 15;
@@ -930,6 +941,19 @@
                 const r = new FileReader();
                 r.onload = (ev) => {
                     state.bonk.sound = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('input-dizzy-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.dizzy.img = ev.target.result;
+                    updateDizzyParticles();
                     saveAuto();
                 };
                 r.readAsDataURL(file);
