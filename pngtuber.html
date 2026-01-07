@@ -505,11 +505,13 @@
                             <input type="file" id="input-bonk-sfx" class="hidden" accept="audio/*">
                             
                             <!-- Dizzy (Bonk Effect) -->
-                            <div class="mb-2 grid grid-cols-[1fr_auto] gap-1">
+                            <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
                                 <div class="text-[10px] text-gray-400 flex items-center">💫 Dizzy Particle</div>
                                 <div class="file-btn px-2" onclick="document.getElementById('input-dizzy-img').click()" title="Img">🖼</div>
+                                <div class="file-btn px-2" onclick="document.getElementById('input-dizzy-sfx').click()" title="Sfx">🔊</div>
                             </div>
                             <input type="file" id="input-dizzy-img" class="hidden" accept="image/*">
+                            <input type="file" id="input-dizzy-sfx" class="hidden" accept="audio/*">
 
                             <!-- Throw -->
                             <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
@@ -642,10 +644,15 @@
             throw: { cmd: '!throw', img: 'https://cdn3.emoji.gg/emojis/6429-yeet.png' },
             pat: { cmd: '!pat', img: 'https://cdn3.emoji.gg/emojis/1376-pat.png' },
             cheer: { cmd: '!cheer' },
-            dizzy: { img: 'https://cdn3.emoji.gg/emojis/5684-star.png' }, // New Dizzy particle state
+            dizzy: { img: 'https://cdn3.emoji.gg/emojis/5684-star.png', sound: null },
             
             isSquashed: false,
             isJumping: false,
+            isDodging: false,
+            isPatting: false,
+            
+            // Sounds
+            dizzyAudio: null,
             
             isTalking: false,
             isShouting: false,
@@ -959,6 +966,19 @@
                 r.readAsDataURL(file);
             }
         });
+        
+        // NEW: Dizzy Sound
+        document.getElementById('input-dizzy-sfx').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.dizzy.sound = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
 
         document.getElementById('cmd-throw').addEventListener('input', (e) => {
             state.throw.cmd = e.target.value.trim().toLowerCase();
@@ -1007,10 +1027,25 @@
             setTimeout(() => {
                 state.isSquashed = true; 
                 els.dizzyStars.style.display = 'block';
+                
+                // Play Dizzy Sound Loop
+                if (state.dizzy.sound) {
+                    state.dizzyAudio = new Audio(state.dizzy.sound);
+                    state.dizzyAudio.loop = true;
+                    state.dizzyAudio.play();
+                }
+
                 els.bonkItem.classList.remove('anim-drop');
                 els.bonkItem.classList.add('anim-fly-away');
                 setTimeout(() => {
                     state.isSquashed = false;
+                    
+                    // Stop Dizzy Sound
+                    if(state.dizzyAudio) {
+                        state.dizzyAudio.pause();
+                        state.dizzyAudio = null;
+                    }
+                    
                     els.dizzyStars.style.display = 'none';
                     els.bonkItem.style.display = 'none';
                     els.bonkItem.classList.remove('anim-fly-away');
@@ -1021,6 +1056,13 @@
         window.triggerThrow = () => {
             els.throwItem.style.display = 'block';
             els.throwItem.classList.add('anim-throw');
+            
+            // Start Dodge
+            setTimeout(() => {
+                 state.isDodging = true;
+                 setTimeout(() => { state.isDodging = false; }, 300);
+            }, 250);
+            
             setTimeout(() => {
                 els.throwItem.style.display = 'none';
                 els.throwItem.classList.remove('anim-throw');
@@ -1030,9 +1072,11 @@
         window.triggerPat = () => {
             els.patHand.style.display = 'block';
             els.patHand.classList.add('anim-pat');
+            state.isPatting = true;
             setTimeout(() => {
                 els.patHand.style.display = 'none';
                 els.patHand.classList.remove('anim-pat');
+                state.isPatting = false;
             }, 3000);
         };
 
@@ -1368,9 +1412,25 @@
             if (state.isJumping) {
                 translateY -= 50; 
             }
+            
+            // NEW: Dodge
+            let translateX = 0;
+            if (state.isDodging) {
+                translateX = 40; // Dodge right
+                rotate -= 15; // Lean left
+            }
+            // NEW: Pat
+            if (state.isPatting) {
+                // Gentle squash oscilation
+                const patTime = Date.now() / 100;
+                const squish = Math.sin(patTime * 20) * 0.05; // +/- 0.05
+                scaleY = 1 - 0.1 + squish; // Base squash 0.9 + wobble
+                scaleX = 1 + 0.1 - squish; // Base widen 1.1 - wobble
+                translateY += 10;
+            }
 
             els.stage.style.transform = `scale(${state.isShouting ? zoomScale : 1})`;
-            els.avatarPhysics.style.transform = `translate(0px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
+            els.avatarPhysics.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
             els.avatarImg.style.filter = (state.isShouting && state.volume > 90) ? "brightness(1.2)" : "brightness(1.0)";
         }
 
