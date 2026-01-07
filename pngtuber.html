@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.2</title>
+    <title>Salamander WebTuber v4.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         body { 
             margin: 0; 
@@ -32,7 +33,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            /* FIX: Ensure this layer receives clicks even if parent has pointer-events: none */
             pointer-events: auto; 
         }
         .interactive-layer:active { cursor: grabbing; }
@@ -66,7 +66,6 @@
             justify-content: center;
             align-items: flex-end;
             transform-origin: bottom center;
-            /* Container shouldn't block clicks to things behind it, but children need events */
             pointer-events: none; 
             transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
@@ -111,6 +110,84 @@
         #swear-layer {
             opacity: 0;
             transition: opacity 0.2s ease-in-out;
+        }
+
+        /* --- INTERACTION EFFECTS --- */
+        #interaction-layer {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 50;
+            overflow: hidden;
+        }
+
+        /* Bonk Item */
+        #bonk-item {
+            position: absolute;
+            width: 150px;
+            left: 50%;
+            top: -200px; /* Start off screen */
+            transform: translateX(-50%);
+            display: none;
+        }
+        
+        .anim-drop { animation: dropAnvil 0.4s ease-in forwards; }
+        @keyframes dropAnvil {
+            0% { top: -200px; }
+            100% { top: calc(50% - 180px); } /* Hit head area */
+        }
+        .anim-fly-away { animation: flyAway 0.5s ease-out forwards; }
+        @keyframes flyAway {
+            0% { opacity: 1; transform: translateX(-50%) translateY(0) rotate(0deg); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-100px) rotate(45deg); }
+        }
+
+        /* Dizzy Stars */
+        #dizzy-stars {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 200px; height: 100px;
+            transform: translate(-50%, -250%);
+            display: none;
+        }
+        .star {
+            position: absolute;
+            width: 30px;
+            animation: spinStar 1s linear infinite;
+        }
+        @keyframes spinStar {
+            0% { transform: rotate(0deg) translateX(60px) rotate(0deg); }
+            100% { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
+        }
+
+        /* Throw Item */
+        #throw-item {
+            position: absolute;
+            width: 80px;
+            top: 50%;
+            left: -100px;
+            display: none;
+        }
+        .anim-throw { animation: throwObj 0.6s linear forwards; }
+        @keyframes throwObj {
+            0% { left: -100px; transform: translateY(0) rotate(0deg); }
+            50% { left: 50%; transform: translateY(-50px) rotate(180deg); }
+            100% { left: 120%; transform: translateY(100px) rotate(360deg); }
+        }
+
+        /* Pat Item */
+        #pat-hand {
+            position: absolute;
+            width: 120px;
+            left: 55%;
+            top: 30%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+        .anim-pat { animation: patHead 0.3s ease-in-out infinite alternate; }
+        @keyframes patHead {
+            0% { transform: translate(-50%, -60%) rotate(-5deg); }
+            100% { transform: translate(-50%, -40%) rotate(5deg); }
         }
 
         /* --- UI CONTROLS --- */
@@ -196,6 +273,12 @@
         .btn-layer:hover { border-color: #a855f7; color: white; }
         .btn-layer.back { background: rgba(17, 24, 39, 0.8); border-color: #374151; color: #6b7280; }
 
+        .btn-test {
+            background: #2563eb; color: white; width: 28px; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; cursor: pointer; border: none; font-size: 10px; transition: transform 0.1s;
+        }
+        .btn-test:active { transform: scale(0.9); }
+
         .toggle-btn { @apply text-xs py-1 px-3 rounded border border-gray-600 bg-gray-800 text-gray-300 transition hover:bg-gray-700 cursor-pointer; }
         .toggle-btn.active { @apply bg-purple-600 border-purple-500 text-white; }
 
@@ -260,6 +343,14 @@
             <img id="prop-static-img" src="">
         </div>
 
+        <!-- 4. Interaction Effects (Top Layer) -->
+        <div id="interaction-layer">
+            <img id="bonk-item" src="https://cdn3.emoji.gg/emojis/4365-anvil.png">
+            <img id="throw-item" src="https://cdn3.emoji.gg/emojis/6429-yeet.png">
+            <img id="pat-hand" src="https://cdn3.emoji.gg/emojis/1376-pat.png">
+            <div id="dizzy-stars"></div>
+        </div>
+
     </div>
 
     <!-- Hint -->
@@ -268,7 +359,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.2</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.4</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -389,11 +480,48 @@
                         </div>
                         <div id="twitch-status" class="text-[10px] text-gray-500 mb-2">Not Connected</div>
                         
-                        <div class="grid grid-cols-2 gap-2">
+                        <div class="grid grid-cols-2 gap-2 mb-3">
                             <div><span class="text-[9px] text-gray-400">Normal Cmd</span><input type="text" id="cmd-1" value="!normal"></div>
                             <div><span class="text-[9px] text-gray-400">Happy Cmd</span><input type="text" id="cmd-2" value="!happy"></div>
                             <div><span class="text-[9px] text-gray-400">Angry Cmd</span><input type="text" id="cmd-3" value="!angry"></div>
                             <div><span class="text-[9px] text-gray-400">Sad Cmd</span><input type="text" id="cmd-4" value="!sad"></div>
+                        </div>
+
+                        <!-- Interaction Settings -->
+                        <div class="border-t border-gray-700 pt-2">
+                            <div class="text-[10px] uppercase font-bold text-gray-500 mb-2">Chat Interactions</div>
+                            
+                            <!-- Bonk -->
+                            <div class="mb-2 grid grid-cols-[1fr_auto_auto_auto] gap-1">
+                                <input type="text" id="cmd-bonk" value="!bonk" placeholder="Cmd">
+                                <div class="file-btn px-2" onclick="document.getElementById('input-bonk-img').click()" title="Img">🖼</div>
+                                <div class="file-btn px-2" onclick="document.getElementById('input-bonk-sfx').click()" title="Sfx">🔊</div>
+                                <button class="btn-test" onclick="triggerBonk()" title="Test">▶</button>
+                            </div>
+                            <input type="file" id="input-bonk-img" class="hidden" accept="image/*">
+                            <input type="file" id="input-bonk-sfx" class="hidden" accept="audio/*">
+
+                            <!-- Throw -->
+                            <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
+                                <input type="text" id="cmd-throw" value="!throw" placeholder="Cmd">
+                                <div class="file-btn px-2" onclick="document.getElementById('input-throw-img').click()" title="Img">🖼</div>
+                                <button class="btn-test" onclick="triggerThrow()" title="Test">▶</button>
+                            </div>
+                            <input type="file" id="input-throw-img" class="hidden" accept="image/*">
+
+                            <!-- Pat -->
+                            <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
+                                <input type="text" id="cmd-pat" value="!pat" placeholder="Cmd">
+                                <div class="file-btn px-2" onclick="document.getElementById('input-pat-img').click()" title="Img">🖼</div>
+                                <button class="btn-test" onclick="triggerPat()" title="Test">▶</button>
+                            </div>
+                            <input type="file" id="input-pat-img" class="hidden" accept="image/*">
+
+                            <!-- Cheer -->
+                            <div class="grid grid-cols-[1fr_auto] gap-1">
+                                <input type="text" id="cmd-cheer" value="!cheer" placeholder="Cmd">
+                                <button class="btn-test" onclick="triggerCheer()" title="Test">▶</button>
+                            </div>
                         </div>
                     </div>
 
@@ -499,6 +627,15 @@
             hotkeys: { 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', 4: 'Digit4' },
             chatCmds: { 1: '!normal', 2: '!happy', 3: '!angry', 4: '!sad' },
             
+            // Interaction State
+            bonk: { cmd: '!bonk', img: 'https://cdn3.emoji.gg/emojis/4365-anvil.png', sound: null },
+            throw: { cmd: '!throw', img: 'https://cdn3.emoji.gg/emojis/6429-yeet.png' },
+            pat: { cmd: '!pat', img: 'https://cdn3.emoji.gg/emojis/1376-pat.png' },
+            cheer: { cmd: '!cheer' },
+            
+            isSquashed: false,
+            isJumping: false,
+            
             isTalking: false,
             isShouting: false,
             currentFrameIndex: 0,
@@ -515,7 +652,7 @@
             layout: { 
                 avatar: { x: 0, y: 0, scale: 1 }, 
                 bg: { x: 0, y: 0, scale: 1 },
-                propStatic: { x: 0, y: 0, scale: 1, layer: 'front' }, // Layer added
+                propStatic: { x: 0, y: 0, scale: 1, layer: 'front' }, 
                 propPinned: { x: 0, y: 0, scale: 1 }
             }
         };
@@ -531,6 +668,11 @@
             propStaticImg: document.getElementById('prop-static-img'),
             propPinnedWrapper: document.getElementById('prop-pinned-wrapper'),
             propPinnedImg: document.getElementById('prop-pinned-img'),
+            
+            bonkItem: document.getElementById('bonk-item'),
+            throwItem: document.getElementById('throw-item'),
+            patHand: document.getElementById('pat-hand'),
+            dizzyStars: document.getElementById('dizzy-stars'),
             
             swearLayer: document.getElementById('swear-layer'),
             controls: document.getElementById('controls'),
@@ -550,13 +692,26 @@
             btnLayerStatic: document.getElementById('btn-layer-static')
         };
 
+        // --- INIT STARS ---
+        function initDizzyStars() {
+            els.dizzyStars.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                const img = document.createElement('img');
+                img.src = 'https://cdn3.emoji.gg/emojis/5684-star.png';
+                img.className = 'star';
+                img.style.animationDelay = `${i * -0.2}s`;
+                els.dizzyStars.appendChild(img);
+            }
+        }
+        initDizzyStars();
+
         // --- CORE FUNCTIONS FOR AUTO-SAVE ---
-        
         function getExportData() {
             return {
                 modes: state.modes,
                 hotkeys: state.hotkeys,
                 chatCmds: state.chatCmds,
+                interactions: { bonk: state.bonk, throw: state.throw, pat: state.pat, cheer: state.cheer },
                 settings: {
                     threshold: els.threshold.value,
                     bounce: els.bounce.value,
@@ -572,7 +727,6 @@
                 layout: {
                     avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
                     bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src },
-                    // Save Props
                     propStatic: { style: els.propStaticWrapper.style.cssText, scale: els.propStaticWrapper.getAttribute('data-scale'), src: els.propStaticImg.src, layer: state.layout.propStatic.layer },
                     propPinned: { style: els.propPinnedWrapper.style.cssText, scale: els.propPinnedWrapper.getAttribute('data-scale'), src: els.propPinnedImg.src }
                 }
@@ -581,16 +735,25 @@
 
         function applyProfileData(data) {
             if(data.modes) state.modes = data.modes;
-            if(data.hotkeys) {
-                state.hotkeys = data.hotkeys;
-                [1,2,3,4].forEach(id => {
-                    document.getElementById(`bind-${id}`).value = state.hotkeys[id].replace('Digit','').replace('Key','');
-                    document.getElementById(`badge-${id}`).innerText = document.getElementById(`bind-${id}`).value.substring(0,3);
-                });
-            }
+            if(data.hotkeys) state.hotkeys = data.hotkeys;
             if(data.chatCmds) {
                 state.chatCmds = data.chatCmds;
                 [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).value = state.chatCmds[id]);
+            }
+            if(data.interactions) {
+                state.bonk = data.interactions.bonk || state.bonk;
+                state.throw = data.interactions.throw || state.throw;
+                state.pat = data.interactions.pat || state.pat;
+                state.cheer = data.interactions.cheer || state.cheer;
+                
+                document.getElementById('cmd-bonk').value = state.bonk.cmd;
+                document.getElementById('cmd-throw').value = state.throw.cmd;
+                document.getElementById('cmd-pat').value = state.pat.cmd;
+                document.getElementById('cmd-cheer').value = state.cheer.cmd;
+                
+                els.bonkItem.src = state.bonk.img;
+                els.throwItem.src = state.throw.img;
+                els.patHand.src = state.pat.img;
             }
             if(data.settings) {
                 els.threshold.value = data.settings.threshold || 15;
@@ -621,13 +784,10 @@
                         if(el.style.display === 'none') el.style.display = 'flex';
                     }
                 };
-                
                 applyLayout(els.avatarWrapper, data.layout.avatar);
                 applyLayout(els.bgWrapper, data.layout.bg, els.bgImg);
                 applyLayout(els.propStaticWrapper, data.layout.propStatic, els.propStaticImg);
                 applyLayout(els.propPinnedWrapper, data.layout.propPinned, els.propPinnedImg);
-                
-                // Restore Layer
                 if(data.layout.propStatic && data.layout.propStatic.layer === 'back') {
                     setStaticLayer('back');
                 } else {
@@ -637,7 +797,6 @@
             setMode(1);
         }
 
-        // --- AUTO SAVE LOGIC ---
         function saveAuto() {
             try {
                 const data = getExportData();
@@ -683,11 +842,9 @@
                 const wrapper = document.getElementById(`prop-${type}-wrapper`);
                 const img = document.getElementById(`prop-${type}-img`);
                 const label = document.getElementById(`label-prop-${type}`);
-                
                 img.src = "";
                 wrapper.style.display = 'none';
                 label.innerText = type === 'pinned' ? "🎩 Pinned" : "🎤 Static";
-                
                 saveAuto();
             }
         };
@@ -747,40 +904,135 @@
         }
         [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).addEventListener('input', updateChatCmds));
 
+        // --- INTERACTIONS SETUP ---
+        document.getElementById('cmd-bonk').addEventListener('input', (e) => {
+            state.bonk.cmd = e.target.value.trim().toLowerCase();
+            saveAuto();
+        });
+        document.getElementById('input-bonk-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.bonk.img = ev.target.result;
+                    els.bonkItem.src = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+        document.getElementById('input-bonk-sfx').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.bonk.sound = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('cmd-throw').addEventListener('input', (e) => {
+            state.throw.cmd = e.target.value.trim().toLowerCase();
+            saveAuto();
+        });
+        document.getElementById('input-throw-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.throw.img = ev.target.result;
+                    els.throwItem.src = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('cmd-pat').addEventListener('input', (e) => {
+            state.pat.cmd = e.target.value.trim().toLowerCase();
+            saveAuto();
+        });
+        document.getElementById('input-pat-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.pat.img = ev.target.result;
+                    els.patHand.src = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+        document.getElementById('cmd-cheer').addEventListener('input', (e) => {
+            state.cheer.cmd = e.target.value.trim().toLowerCase();
+            saveAuto();
+        });
+
+        // --- ANIMATION TRIGGERS ---
+        window.triggerBonk = () => {
+            if(state.isSquashed) return; 
+            if(state.bonk.sound) new Audio(state.bonk.sound).play();
+            els.bonkItem.style.display = 'block';
+            els.bonkItem.classList.add('anim-drop');
+            setTimeout(() => {
+                state.isSquashed = true; 
+                els.dizzyStars.style.display = 'block';
+                els.bonkItem.classList.remove('anim-drop');
+                els.bonkItem.classList.add('anim-fly-away');
+                setTimeout(() => {
+                    state.isSquashed = false;
+                    els.dizzyStars.style.display = 'none';
+                    els.bonkItem.style.display = 'none';
+                    els.bonkItem.classList.remove('anim-fly-away');
+                }, 3000);
+            }, 400); 
+        };
+
+        window.triggerThrow = () => {
+            els.throwItem.style.display = 'block';
+            els.throwItem.classList.add('anim-throw');
+            setTimeout(() => {
+                els.throwItem.style.display = 'none';
+                els.throwItem.classList.remove('anim-throw');
+            }, 600);
+        };
+
+        window.triggerPat = () => {
+            els.patHand.style.display = 'block';
+            els.patHand.classList.add('anim-pat');
+            setTimeout(() => {
+                els.patHand.style.display = 'none';
+                els.patHand.classList.remove('anim-pat');
+            }, 3000);
+        };
+
+        window.triggerCheer = () => {
+            const end = Date.now() + 2000;
+            state.isJumping = true;
+            (function frame() {
+                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } });
+                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+            setTimeout(() => { state.isJumping = false; }, 2000);
+        };
+
         // --- MODE SWITCHING ---
         window.setMode = (modeId) => {
             state.activeMode = modeId;
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`mode-${modeId}`).classList.add('active');
-            
             const modeName = state.modes[modeId].name;
             document.getElementById('current-mode-name').innerText = modeName;
-            
             const idleCount = state.modes[modeId].idle.length;
             const talkCount = state.modes[modeId].talk.length;
-            
-            const idleLabel = document.getElementById('label-idle');
-            const talkLabel = document.getElementById('label-talk');
-            
-            if(idleCount > 0) {
-                idleLabel.innerText = `✅ ${idleCount} Frames`;
-                idleLabel.parentElement.classList.add('border-green-500', 'text-green-400');
-            } else {
-                idleLabel.innerText = `📂 Idle Frames`;
-                idleLabel.parentElement.classList.remove('border-green-500', 'text-green-400');
-            }
-            
-            if(talkCount > 0) {
-                talkLabel.innerText = `✅ ${talkCount} Frames`;
-                talkLabel.parentElement.classList.add('border-green-500', 'text-green-400');
-            } else {
-                talkLabel.innerText = `📂 Talk Frames`;
-                talkLabel.parentElement.classList.remove('border-green-500', 'text-green-400');
-            }
-            
+            document.getElementById('label-idle').innerText = idleCount > 0 ? `✅ ${idleCount} Frames` : `📂 Idle Frames`;
+            document.getElementById('label-talk').innerText = talkCount > 0 ? `✅ ${talkCount} Frames` : `📂 Talk Frames`;
             state.currentFrameIndex = 0;
             state.isBlinking = false;
-            
             const activeFrames = state.modes[modeId].idle;
             if(activeFrames.length > 0) els.avatarImg.src = activeFrames[0];
             else els.avatarImg.src = ""; 
@@ -790,11 +1042,13 @@
         document.getElementById('btn-twitch-connect').addEventListener('click', () => {
             const channel = els.twitchChannel.value.trim();
             if(!channel) return alert("Enter a channel name!");
-            
             try { ComfyJS.Disconnect(); } catch(e){}
-
             ComfyJS.onCommand = (user, command, message, flags, extra) => {
                 const fullCmd = "!" + command.toLowerCase();
+                if(fullCmd === state.bonk.cmd) return triggerBonk();
+                if(fullCmd === state.throw.cmd) return triggerThrow();
+                if(fullCmd === state.pat.cmd) return triggerPat();
+                if(fullCmd === state.cheer.cmd) return triggerCheer();
                 for (const [modeId, trigger] of Object.entries(state.chatCmds)) {
                     if (trigger === fullCmd) {
                         setMode(parseInt(modeId));
@@ -803,13 +1057,11 @@
                     }
                 }
             };
-
             ComfyJS.onConnected = () => {
                 els.twitchStatus.innerText = "✅ Connected to " + channel;
                 els.twitchStatus.classList.add('text-green-400');
                 saveAuto();
             };
-
             ComfyJS.Init(channel);
         });
 
@@ -856,7 +1108,7 @@
             el.addEventListener('mousedown', (e) => {
                 if (state.isLocked) return;
                 if (e.button !== 0) return;
-                e.stopPropagation(); // FIX for pinned props
+                e.stopPropagation(); 
                 e.preventDefault();
                 dragTarget = el;
                 startX = e.clientX;
@@ -1079,6 +1331,16 @@
                     });
                 } else els.swearLayer.style.opacity = 0;
             } else els.swearLayer.style.opacity = 0;
+
+            // Interactions override physics
+            if (state.isSquashed) {
+                scaleY = 0.1;
+                scaleX = 1.5;
+                translateY = 180; 
+            }
+            if (state.isJumping) {
+                translateY -= 50; 
+            }
 
             els.stage.style.transform = `scale(${state.isShouting ? zoomScale : 1})`;
             els.avatarPhysics.style.transform = `translate(0px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
