@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.8</title>
+    <title>Salamander WebTuber v4.9</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -41,7 +41,9 @@
         /* FLIP Utility Class */
         .flipped { transform: scaleX(-1); }
 
-        /* Background specific */
+        /* Z-INDEX STACKING ORDER */
+        
+        /* 1. Background (Bottom) */
         #bg-wrapper {
             top: 50%; left: 50%;
             width: 100vw; height: 100vh;
@@ -53,7 +55,17 @@
             pointer-events: none;
         }
 
-        /* Avatar specific */
+        /* 2. Static Props (Back Layer) - Behind Avatar */
+        #props-static-back {
+            position: absolute;
+            inset: 0;
+            pointer-events: none; /* Let clicks pass to BG if empty */
+            z-index: 5;
+        }
+        /* Restore pointer events for children */
+        #props-static-back .interactive-layer { pointer-events: auto; }
+
+        /* 3. Avatar Group (Middle) */
         #avatar-wrapper {
             top: 50%; left: 50%;
             width: 400px; height: 400px;
@@ -82,19 +94,28 @@
             transition: filter 0.1s;
         }
 
-        /* 3. Pinned Props (Attached to Avatar Physics) */
+        /* 4. Pinned Props (Attached to Avatar Physics) - On top of Avatar */
         .prop-pinned {
             z-index: 15;
             width: 150px; height: 150px;
         }
         .prop-pinned img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
-        /* 4. Static Props (Foreground / Desk) */
+        /* 5. Static Props (Front Layer) - In front of Avatar & Pinned Props */
+        #props-static-front {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 30;
+        }
+        #props-static-front .interactive-layer { pointer-events: auto; }
+
+        /* Common Prop Styles */
         .prop-static {
-            z-index: 30; /* Default Front */
             width: 300px; height: 300px;
         }
         .prop-static img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
 
         /* Swear Symbols */
         .swear-symbol {
@@ -112,7 +133,7 @@
             transition: opacity 0.2s ease-in-out;
         }
 
-        /* --- INTERACTION EFFECTS (SYNCED TO AVATAR WRAPPER) --- */
+        /* 6. Interaction Effects (Topmost) */
         #interaction-layer {
             position: absolute;
             inset: 0;
@@ -384,7 +405,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.8</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
