@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.1</title>
+    <title>Salamander WebTuber v4.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -92,7 +92,7 @@
         #prop-static-wrapper {
             top: 80%; left: 50%;
             width: 600px; height: 300px;
-            z-index: 30;
+            z-index: 30; /* Default Front */
             transform: translate(-50%, -50%) scale(1);
         }
         #prop-static-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
@@ -188,6 +188,14 @@
         }
         .btn-clear:hover { background: rgba(185, 28, 28, 0.6); color: white; border-color: #ef4444; }
 
+        .btn-layer {
+            background: rgba(31, 41, 55, 0.8); border: 1px solid #4b5563;
+            color: #9ca3af; width: 40px; display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 10px; font-weight: bold;
+        }
+        .btn-layer:hover { border-color: #a855f7; color: white; }
+        .btn-layer.back { background: rgba(17, 24, 39, 0.8); border-color: #374151; color: #6b7280; }
+
         .toggle-btn { @apply text-xs py-1 px-3 rounded border border-gray-600 bg-gray-800 text-gray-300 transition hover:bg-gray-700 cursor-pointer; }
         .toggle-btn.active { @apply bg-purple-600 border-purple-500 text-white; }
 
@@ -232,13 +240,13 @@
             <img id="bg-img" src="" style="display:none;">
         </div>
 
-        <!-- 2. Avatar Group -->
+        <!-- 2. Avatar Group (Z-Index 10) -->
         <div id="avatar-wrapper" class="interactive-layer">
             <!-- Physics Container (Bounces/Squashes) -->
             <div id="avatar-physics">
                 <img id="avatar-img" src="https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png">
                 
-                <!-- Pinned Prop (Moves WITH Physics) -->
+                <!-- Pinned Prop (Moves WITH Physics) - Z-Index 15 -->
                 <div id="prop-pinned-wrapper" class="interactive-layer prop-pinned" style="display:none;">
                     <img id="prop-pinned-img" src="">
                 </div>
@@ -247,7 +255,7 @@
             </div>
         </div>
 
-        <!-- 3. Static Prop (Foreground / Desk) -->
+        <!-- 3. Static Prop (Foreground / Desk) - Z-Index 30 or 5 -->
         <div id="prop-static-wrapper" class="interactive-layer" style="display:none;">
             <img id="prop-static-img" src="">
         </div>
@@ -260,7 +268,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.1</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.2</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -325,7 +333,7 @@
             <input type="file" id="input-talk" class="hidden" multiple accept="image/*">
         </div>
 
-        <!-- NEW: PROPS SYSTEM -->
+        <!-- PROPS SYSTEM -->
         <div class="control-group">
             <label>Props & Layers</label>
             <div class="grid grid-cols-2 gap-2">
@@ -341,6 +349,7 @@
                     <div class="file-btn" onclick="document.getElementById('input-prop-static').click()">
                         <span id="label-prop-static">🎤 Static</span>
                     </div>
+                    <button id="btn-layer-static" class="btn-layer" onclick="toggleStaticLayer()" title="Change Layer: Front/Back">Front</button>
                     <button class="btn-clear" onclick="clearProp('static')" title="Remove Prop">🗑</button>
                 </div>
             </div>
@@ -502,11 +511,11 @@
             randomTalk: true,
             isLocked: false,
             
-            // Layout (Now includes props)
+            // Layout
             layout: { 
                 avatar: { x: 0, y: 0, scale: 1 }, 
                 bg: { x: 0, y: 0, scale: 1 },
-                propStatic: { x: 0, y: 0, scale: 1 },
+                propStatic: { x: 0, y: 0, scale: 1, layer: 'front' }, // Layer added
                 propPinned: { x: 0, y: 0, scale: 1 }
             }
         };
@@ -537,7 +546,8 @@
             audioSelect: document.getElementById('audio-device-select'),
             btnLock: document.getElementById('btn-lock'),
             twitchChannel: document.getElementById('twitch-channel'),
-            twitchStatus: document.getElementById('twitch-status')
+            twitchStatus: document.getElementById('twitch-status'),
+            btnLayerStatic: document.getElementById('btn-layer-static')
         };
 
         // --- CORE FUNCTIONS FOR AUTO-SAVE ---
@@ -563,7 +573,7 @@
                     avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
                     bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src },
                     // Save Props
-                    propStatic: { style: els.propStaticWrapper.style.cssText, scale: els.propStaticWrapper.getAttribute('data-scale'), src: els.propStaticImg.src },
+                    propStatic: { style: els.propStaticWrapper.style.cssText, scale: els.propStaticWrapper.getAttribute('data-scale'), src: els.propStaticImg.src, layer: state.layout.propStatic.layer },
                     propPinned: { style: els.propPinnedWrapper.style.cssText, scale: els.propPinnedWrapper.getAttribute('data-scale'), src: els.propPinnedImg.src }
                 }
             };
@@ -607,7 +617,7 @@
                     el.setAttribute('data-scale', cfg.scale || 1);
                     if(imgEl && cfg.src && cfg.src.length > 100) {
                         imgEl.src = cfg.src;
-                        imgEl.style.display = 'block'; // Make visible if src exists
+                        imgEl.style.display = 'block'; 
                         if(el.style.display === 'none') el.style.display = 'flex';
                     }
                 };
@@ -616,6 +626,13 @@
                 applyLayout(els.bgWrapper, data.layout.bg, els.bgImg);
                 applyLayout(els.propStaticWrapper, data.layout.propStatic, els.propStaticImg);
                 applyLayout(els.propPinnedWrapper, data.layout.propPinned, els.propPinnedImg);
+                
+                // Restore Layer
+                if(data.layout.propStatic && data.layout.propStatic.layer === 'back') {
+                    setStaticLayer('back');
+                } else {
+                    setStaticLayer('front');
+                }
             }
             setMode(1);
         }
@@ -653,7 +670,6 @@
         window.clearFrames = (type) => {
             if(confirm(`Clear ${type} frames for this mode?`)) {
                 state.modes[state.activeMode][type] = [];
-                // Update UI
                 const label = document.getElementById(`label-${type}`);
                 label.innerText = `📂 ${type.charAt(0).toUpperCase() + type.slice(1)} Frames`;
                 label.parentElement.classList.remove('border-green-500', 'text-green-400');
@@ -684,6 +700,27 @@
                 saveAuto();
             }
         };
+
+        // --- STATIC LAYER LOGIC ---
+        function toggleStaticLayer() {
+            const current = state.layout.propStatic.layer;
+            setStaticLayer(current === 'back' ? 'front' : 'back');
+            saveAuto();
+        }
+
+        function setStaticLayer(layer) {
+            state.layout.propStatic.layer = layer;
+            const btn = els.btnLayerStatic;
+            if(layer === 'back') {
+                els.propStaticWrapper.style.zIndex = 5; // Behind avatar (10)
+                btn.innerText = "Back";
+                btn.classList.add('back');
+            } else {
+                els.propStaticWrapper.style.zIndex = 30; // Front
+                btn.innerText = "Front";
+                btn.classList.remove('back');
+            }
+        }
 
         // --- INPUT CONFIGURATION ---
         function setupKeyBinders() {
@@ -722,7 +759,6 @@
             const idleCount = state.modes[modeId].idle.length;
             const talkCount = state.modes[modeId].talk.length;
             
-            // UI State
             const idleLabel = document.getElementById('label-idle');
             const talkLabel = document.getElementById('label-talk');
             
@@ -747,7 +783,7 @@
             
             const activeFrames = state.modes[modeId].idle;
             if(activeFrames.length > 0) els.avatarImg.src = activeFrames[0];
-            else els.avatarImg.src = ""; // Or clear transparent
+            else els.avatarImg.src = ""; 
         };
 
         // --- TWITCH INTEGRATION ---
@@ -820,6 +856,7 @@
             el.addEventListener('mousedown', (e) => {
                 if (state.isLocked) return;
                 if (e.button !== 0) return;
+                e.stopPropagation(); // FIX for pinned props
                 e.preventDefault();
                 dragTarget = el;
                 startX = e.clientX;
