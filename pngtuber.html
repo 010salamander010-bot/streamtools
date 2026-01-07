@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.6</title>
+    <title>Salamander WebTuber v4.8</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -37,6 +37,9 @@
         }
         .interactive-layer:active { cursor: grabbing; }
         .interactive-layer.locked { cursor: default; pointer-events: none; }
+
+        /* FLIP Utility Class */
+        .flipped { transform: scaleX(-1); }
 
         /* Background specific */
         #bg-wrapper {
@@ -82,19 +85,16 @@
         /* 3. Pinned Props (Attached to Avatar Physics) */
         .prop-pinned {
             z-index: 15;
-            top: 20%; left: 50%; 
             width: 150px; height: 150px;
         }
         .prop-pinned img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
         /* 4. Static Props (Foreground / Desk) */
-        #prop-static-wrapper {
-            top: 80%; left: 50%;
-            width: 600px; height: 300px;
+        .prop-static {
             z-index: 30; /* Default Front */
-            transform: translate(-50%, -50%) scale(1);
+            width: 300px; height: 300px;
         }
-        #prop-static-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .prop-static img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
         /* Swear Symbols */
         .swear-symbol {
@@ -274,6 +274,15 @@
         .btn-layer:hover { border-color: #a855f7; color: white; }
         .btn-layer.back { background: rgba(17, 24, 39, 0.8); border-color: #374151; color: #6b7280; }
 
+        /* Flip Button */
+        .btn-flip {
+            background: rgba(31, 41, 55, 0.8); border: 1px solid #4b5563;
+            color: #9ca3af; width: 32px; display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 12px;
+        }
+        .btn-flip:hover { border-color: #a855f7; color: white; }
+        .btn-flip.active { color: #a855f7; border-color: #a855f7; }
+
         .btn-test {
             background: #2563eb; color: white; width: 28px; display: flex; align-items: center; justify-content: center;
             border-radius: 4px; cursor: pointer; border: none; font-size: 10px; transition: transform 0.1s;
@@ -312,6 +321,20 @@
             padding: 2px 0;
         }
         .key-bind-input:focus { border-color: #a855f7; background-color: #4c1d95 !important; }
+
+        /* Prop List Style */
+        .prop-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #4b5563;
+            border-radius: 4px;
+            padding: 4px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        .prop-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70px; }
     </style>
 </head>
 <body class="show-hint">
@@ -324,6 +347,9 @@
             <img id="bg-img" src="" style="display:none;">
         </div>
 
+        <!-- 3. Static Props Container (Back) -->
+        <div id="props-static-back"></div>
+
         <!-- 2. Avatar Group (Z-Index 10) -->
         <div id="avatar-wrapper" class="interactive-layer">
             
@@ -331,10 +357,8 @@
             <div id="avatar-physics">
                 <img id="avatar-img" src="https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png">
                 
-                <!-- Pinned Prop (Moves WITH Physics) - Z-Index 15 -->
-                <div id="prop-pinned-wrapper" class="interactive-layer prop-pinned" style="display:none;">
-                    <img id="prop-pinned-img" src="">
-                </div>
+                <!-- Pinned Props Container -->
+                <div id="props-pinned-container" class="absolute inset-0 pointer-events-none"></div>
 
                 <div id="swear-layer" class="absolute inset-0 pointer-events-none"></div>
             </div>
@@ -349,10 +373,8 @@
 
         </div>
 
-        <!-- 3. Static Prop (Foreground / Desk) - Z-Index 30 or 5 -->
-        <div id="prop-static-wrapper" class="interactive-layer" style="display:none;">
-            <img id="prop-static-img" src="">
-        </div>
+        <!-- 3. Static Props Container (Front) -->
+        <div id="props-static-front"></div>
 
     </div>
 
@@ -362,7 +384,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.6</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.8</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -430,28 +452,26 @@
         <!-- PROPS SYSTEM -->
         <div class="control-group">
             <label>Props & Layers</label>
-            <div class="grid grid-cols-2 gap-2">
-                <!-- Pinned -->
-                <div class="flex gap-1">
-                    <div class="file-btn" onclick="document.getElementById('input-prop-pinned').click()">
-                        <span id="label-prop-pinned">🎩 Pinned</span>
-                    </div>
-                    <button class="btn-clear" onclick="clearProp('pinned')" title="Remove Prop">🗑</button>
+            
+            <!-- Pinned Props -->
+            <div class="mb-2">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] text-gray-400">Pinned (Bounces with you)</span>
+                    <button class="text-xs text-blue-400 hover:text-white" onclick="document.getElementById('input-prop-pinned').click()">+ Add</button>
                 </div>
-                <!-- Static -->
-                <div class="flex gap-1">
-                    <div class="file-btn" onclick="document.getElementById('input-prop-static').click()">
-                        <span id="label-prop-static">🎤 Static</span>
-                    </div>
-                    <button id="btn-layer-static" class="btn-layer" onclick="toggleStaticLayer()" title="Change Layer: Front/Back">Front</button>
-                    <button class="btn-clear" onclick="clearProp('static')" title="Remove Prop">🗑</button>
+                <div id="list-pinned" class="space-y-1"></div>
+                <input type="file" id="input-prop-pinned" class="hidden" accept="image/*">
+            </div>
+
+            <!-- Static Props -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] text-gray-400">Static (Stays Put)</span>
+                    <button class="text-xs text-blue-400 hover:text-white" onclick="document.getElementById('input-prop-static').click()">+ Add</button>
                 </div>
+                <div id="list-static" class="space-y-1"></div>
+                <input type="file" id="input-prop-static" class="hidden" accept="image/*">
             </div>
-            <div class="text-[10px] text-gray-500 mt-1">
-                <b>Pinned:</b> Bounces with you. <b>Static:</b> Stays in foreground.
-            </div>
-            <input type="file" id="input-prop-pinned" class="hidden" accept="image/*">
-            <input type="file" id="input-prop-static" class="hidden" accept="image/*">
         </div>
 
         <!-- Input & Integration Settings -->
@@ -613,6 +633,7 @@
                 <div class="file-btn flex-1" onclick="document.getElementById('input-bg').click()">
                     <span id="label-bg">🖼 Upload</span>
                 </div>
+                <button class="btn-flip" onclick="toggleBgFlip()" title="Flip">↔</button>
                 <button class="btn-clear" onclick="clearBg()" title="Clear Background">🗑</button>
             </div>
             <input type="file" id="input-bg" class="hidden" accept="image/*">
@@ -666,12 +687,12 @@
             randomTalk: true,
             isLocked: false,
             
-            // Layout
+            // Layout (Now includes props arrays)
             layout: { 
                 avatar: { x: 0, y: 0, scale: 1 }, 
-                bg: { x: 0, y: 0, scale: 1 },
-                propStatic: { x: 0, y: 0, scale: 1, layer: 'front' }, 
-                propPinned: { x: 0, y: 0, scale: 1 }
+                bg: { x: 0, y: 0, scale: 1, flip: false },
+                propsStatic: [], // Array of { id, src, x, y, scale, layer, flip }
+                propsPinned: []  // Array of { id, src, x, y, scale, flip }
             }
         };
 
@@ -682,10 +703,11 @@
             avatarImg: document.getElementById('avatar-img'),
             bgWrapper: document.getElementById('bg-wrapper'),
             bgImg: document.getElementById('bg-img'),
-            propStaticWrapper: document.getElementById('prop-static-wrapper'),
-            propStaticImg: document.getElementById('prop-static-img'),
-            propPinnedWrapper: document.getElementById('prop-pinned-wrapper'),
-            propPinnedImg: document.getElementById('prop-pinned-img'),
+            propsStaticFront: document.getElementById('props-static-front'),
+            propsStaticBack: document.getElementById('props-static-back'),
+            propsPinnedContainer: document.getElementById('props-pinned-container'),
+            listPinned: document.getElementById('list-pinned'),
+            listStatic: document.getElementById('list-static'),
             
             bonkItem: document.getElementById('bonk-item'),
             throwItem: document.getElementById('throw-item'),
@@ -744,9 +766,9 @@
                 },
                 layout: {
                     avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
-                    bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src },
-                    propStatic: { style: els.propStaticWrapper.style.cssText, scale: els.propStaticWrapper.getAttribute('data-scale'), src: els.propStaticImg.src, layer: state.layout.propStatic.layer },
-                    propPinned: { style: els.propPinnedWrapper.style.cssText, scale: els.propPinnedWrapper.getAttribute('data-scale'), src: els.propPinnedImg.src }
+                    bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src, flip: state.layout.bg.flip },
+                    propsStatic: state.layout.propsStatic,
+                    propsPinned: state.layout.propsPinned
                 }
             };
         }
@@ -807,18 +829,38 @@
                 };
                 applyLayout(els.avatarWrapper, data.layout.avatar);
                 applyLayout(els.bgWrapper, data.layout.bg, els.bgImg);
-                applyLayout(els.propStaticWrapper, data.layout.propStatic, els.propStaticImg);
-                applyLayout(els.propPinnedWrapper, data.layout.propPinned, els.propPinnedImg);
-                if(data.layout.propStatic && data.layout.propStatic.layer === 'back') {
-                    setStaticLayer('back');
-                } else {
-                    setStaticLayer('front');
-                }
+
+                // Restore BG Flip
+                state.layout.bg.flip = data.layout.bg.flip || false;
+                if(state.layout.bg.flip) els.bgImg.classList.add('flipped');
+                else els.bgImg.classList.remove('flipped');
+
+                // Restore Props
+                state.layout.propsStatic = data.layout.propsStatic || [];
+                state.layout.propsPinned = data.layout.propsPinned || [];
+                renderProps();
             }
             setMode(1);
         }
 
         function saveAuto() {
+            // Sync Static Props DOM Styles
+            state.layout.propsStatic.forEach(prop => {
+                const el = document.getElementById(`prop-${prop.id}`);
+                if(el) {
+                    prop.style = el.style.cssText;
+                    prop.scale = el.getAttribute('data-scale');
+                }
+            });
+            // Sync Pinned Props DOM Styles
+            state.layout.propsPinned.forEach(prop => {
+                const el = document.getElementById(`prop-${prop.id}`);
+                if(el) {
+                    prop.style = el.style.cssText;
+                    prop.scale = el.getAttribute('data-scale');
+                }
+            });
+
             try {
                 const data = getExportData();
                 localStorage.setItem('webTuber_profile', JSON.stringify(data));
@@ -875,30 +917,152 @@
                 els.bgImg.src = "";
                 els.bgImg.style.display = 'none';
                 document.getElementById('label-bg').innerText = "🖼 Upload";
+                state.layout.bg.flip = false;
+                els.bgImg.classList.remove('flipped');
                 saveAuto();
             }
         };
 
-        // --- STATIC LAYER LOGIC ---
-        function toggleStaticLayer() {
-            const current = state.layout.propStatic.layer;
-            setStaticLayer(current === 'back' ? 'front' : 'back');
+        // --- BG FLIP ---
+        window.toggleBgFlip = () => {
+            state.layout.bg.flip = !state.layout.bg.flip;
+            if(state.layout.bg.flip) els.bgImg.classList.add('flipped');
+            else els.bgImg.classList.remove('flipped');
             saveAuto();
         }
 
-        function setStaticLayer(layer) {
-            state.layout.propStatic.layer = layer;
-            const btn = els.btnLayerStatic;
-            if(layer === 'back') {
-                els.propStaticWrapper.style.zIndex = 5; // Behind avatar (10)
-                btn.innerText = "Back";
-                btn.classList.add('back');
+        // --- PROPS LOGIC ---
+        function addProp(type, src) {
+            const id = Date.now().toString();
+            const prop = {
+                id: id,
+                src: src,
+                style: type === 'pinned' ? 'top: 20%; left: 50%; width: 150px; height: 150px;' : 'top: 80%; left: 50%; width: 600px; height: 300px;',
+                scale: 1,
+                layer: 'front', // only for static
+                flip: false
+            };
+
+            if (type === 'static') {
+                state.layout.propsStatic.push(prop);
             } else {
-                els.propStaticWrapper.style.zIndex = 30; // Front
-                btn.innerText = "Front";
-                btn.classList.remove('back');
+                state.layout.propsPinned.push(prop);
+            }
+            renderProps();
+            saveAuto();
+        }
+
+        function removeProp(type, id) {
+            if(confirm("Remove this prop?")) {
+                if (type === 'static') {
+                    state.layout.propsStatic = state.layout.propsStatic.filter(p => p.id !== id);
+                } else {
+                    state.layout.propsPinned = state.layout.propsPinned.filter(p => p.id !== id);
+                }
+                renderProps();
+                saveAuto();
             }
         }
+
+        function togglePropLayer(id) {
+            const prop = state.layout.propsStatic.find(p => p.id === id);
+            if (prop) {
+                prop.layer = prop.layer === 'front' ? 'back' : 'front';
+                renderProps();
+                saveAuto();
+            }
+        }
+
+        function togglePropFlip(type, id) {
+            const list = type === 'static' ? state.layout.propsStatic : state.layout.propsPinned;
+            const prop = list.find(p => p.id === id);
+            if (prop) {
+                prop.flip = !prop.flip;
+                // Update DOM directly for speed
+                const img = document.querySelector(`#prop-${id} img`);
+                if(img) {
+                     if(prop.flip) img.classList.add('flipped');
+                     else img.classList.remove('flipped');
+                }
+                saveAuto();
+            }
+        }
+
+        function renderProps() {
+            // Clear containers
+            els.propsStaticFront.innerHTML = '';
+            els.propsStaticBack.innerHTML = '';
+            els.propsPinnedContainer.innerHTML = '';
+            els.listPinned.innerHTML = '';
+            els.listStatic.innerHTML = '';
+
+            // Render Static Props
+            state.layout.propsStatic.forEach(prop => {
+                // DOM Element
+                const el = document.createElement('div');
+                el.id = `prop-${prop.id}`;
+                el.className = 'interactive-layer prop-static';
+                el.style.cssText = prop.style;
+                el.setAttribute('data-scale', prop.scale);
+                
+                const img = document.createElement('img');
+                img.src = prop.src;
+                if(prop.flip) img.classList.add('flipped');
+                el.appendChild(img);
+
+                makeInteractive(el);
+
+                if (prop.layer === 'back') {
+                    els.propsStaticBack.appendChild(el);
+                } else {
+                    els.propsStaticFront.appendChild(el);
+                }
+
+                // UI List Item
+                const li = document.createElement('div');
+                li.className = 'prop-item';
+                li.innerHTML = `
+                    <span>Prop ${prop.id.slice(-4)}</span>
+                    <div class="flex gap-1">
+                        <button class="btn-flip" onclick="togglePropFlip('static', '${prop.id}')" title="Flip">↔</button>
+                        <button class="btn-layer ${prop.layer === 'back' ? 'back' : ''}" onclick="togglePropLayer('${prop.id}')">${prop.layer === 'back' ? 'Back' : 'Front'}</button>
+                        <button class="btn-clear" onclick="removeProp('static', '${prop.id}')">🗑</button>
+                    </div>
+                `;
+                els.listStatic.appendChild(li);
+            });
+
+            // Render Pinned Props
+            state.layout.propsPinned.forEach(prop => {
+                // DOM Element
+                const el = document.createElement('div');
+                el.id = `prop-${prop.id}`;
+                el.className = 'interactive-layer prop-pinned';
+                el.style.cssText = prop.style;
+                el.setAttribute('data-scale', prop.scale);
+
+                const img = document.createElement('img');
+                img.src = prop.src;
+                if(prop.flip) img.classList.add('flipped');
+                el.appendChild(img);
+
+                makeInteractive(el);
+                els.propsPinnedContainer.appendChild(el);
+
+                // UI List Item
+                const li = document.createElement('div');
+                li.className = 'prop-item';
+                li.innerHTML = `
+                    <span>Prop ${prop.id.slice(-4)}</span>
+                    <div class="flex gap-1">
+                         <button class="btn-flip" onclick="togglePropFlip('pinned', '${prop.id}')" title="Flip">↔</button>
+                         <button class="btn-clear" onclick="removeProp('pinned', '${prop.id}')">🗑</button>
+                    </div>
+                `;
+                els.listPinned.appendChild(li);
+            });
+        }
+
 
         // --- INPUT CONFIGURATION ---
         function setupKeyBinders() {
@@ -1226,8 +1390,6 @@
 
         makeInteractive(els.avatarWrapper);
         makeInteractive(els.bgWrapper);
-        makeInteractive(els.propStaticWrapper);
-        makeInteractive(els.propPinnedWrapper);
 
         els.btnLock.addEventListener('click', () => {
             state.isLocked = !state.isLocked;
@@ -1246,12 +1408,35 @@
             if(confirm("Reset positions?")) {
                 ['avatarWrapper', 'bgWrapper', 'propStaticWrapper', 'propPinnedWrapper'].forEach(key => {
                     const el = els[key];
-                    el.style.left = '50%';
-                    el.style.top = '50%';
-                    el.setAttribute('data-scale', 1);
-                    el.setAttribute('data-dragged', 'false');
-                    el.style.transform = `translate(-50%, -50%) scale(1)`;
+                    if (el) { // Safety check
+                        el.style.left = '50%';
+                        el.style.top = '50%';
+                        el.setAttribute('data-scale', 1);
+                        el.setAttribute('data-dragged', 'false');
+                        el.style.transform = `translate(-50%, -50%) scale(1)`;
+                    }
                 });
+                
+                // Also reset array prop positions
+                state.layout.propsStatic.forEach(p => {
+                    const el = document.getElementById(`prop-${p.id}`);
+                    if(el) {
+                        el.style.left = '50%';
+                        el.style.top = '80%';
+                        el.setAttribute('data-scale', 1);
+                        updateTransform(el);
+                    }
+                });
+                state.layout.propsPinned.forEach(p => {
+                    const el = document.getElementById(`prop-${p.id}`);
+                    if(el) {
+                        el.style.left = '50%';
+                        el.style.top = '20%';
+                        el.setAttribute('data-scale', 1);
+                        updateTransform(el);
+                    }
+                });
+                
                 saveAuto();
             }
         };
@@ -1472,18 +1657,31 @@
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (ev) => {
-                        document.getElementById(imgId).src = ev.target.result;
-                        document.getElementById(wrapperId).style.display = 'flex';
-                        document.getElementById(labelId).innerText = "✅ Loaded";
-                        saveAuto();
+                        addProp(stateKey === 'propStatic' ? 'static' : 'pinned', ev.target.result);
                     };
                     reader.readAsDataURL(file);
                 }
             });
         };
+        // Reuse generic props uploader for multiple items logic
+        // We modify input listeners to call addProp instead of single set
+        document.getElementById('input-prop-static').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => addProp('static', ev.target.result);
+                r.readAsDataURL(file);
+            }
+        });
+        document.getElementById('input-prop-pinned').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => addProp('pinned', ev.target.result);
+                r.readAsDataURL(file);
+            }
+        });
 
-        handlePropUpload('input-prop-static', 'label-prop-static', 'prop-static-wrapper', 'prop-static-img', 'propStatic');
-        handlePropUpload('input-prop-pinned', 'label-prop-pinned', 'prop-pinned-wrapper', 'prop-pinned-img', 'propPinned');
 
         document.getElementById('input-bg').addEventListener('change', (e) => {
             const file = e.target.files[0];
