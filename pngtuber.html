@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.1</title>
+    <title>Salamander WebTuber v4.9.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.1</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.3</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -1325,12 +1325,29 @@
             ComfyJS.Init(channel);
         });
 
+        const toggleUI = () => {
+            els.controls.classList.toggle('hidden');
+            document.body.classList.toggle('show-hint');
+        };
+        document.getElementById('btn-hide').addEventListener('click', toggleUI);
+        
         window.addEventListener('keydown', (e) => {
+            // Ignore if typing in input field
             if (e.target.tagName === 'INPUT') return;
-            for (const [modeId, keyCode] of Object.entries(state.hotkeys)) {
-                if (e.code === keyCode) setMode(parseInt(modeId));
+
+            // 'H' key toggle
+            if (e.key.toLowerCase() === 'h') {
+                e.preventDefault(); 
+                toggleUI();
+                return;
             }
-            if (e.key.toLowerCase() === 'h') toggleUI();
+
+            // Mode hotkeys
+            for (const [modeId, keyCode] of Object.entries(state.hotkeys)) {
+                if (e.code === keyCode) {
+                    setMode(parseInt(modeId));
+                }
+            }
         });
 
         // --- EXPORT / IMPORT ---
@@ -1740,13 +1757,6 @@
                 els.swearLayer.appendChild(el);
             }
         }
-
-        const toggleUI = () => {
-            els.controls.classList.toggle('hidden');
-            document.body.classList.toggle('show-hint');
-        };
-        document.getElementById('btn-hide').addEventListener('click', toggleUI);
-        window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'h') toggleUI(); });
 
         ['btn-toggle-swear', 'btn-toggle-shake'].forEach(id => {
             document.getElementById(id).addEventListener('click', function() {
