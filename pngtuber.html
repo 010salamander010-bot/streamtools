@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.8</title>
+    <title>Salamander WebTuber v4.9.10</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.8</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.10</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -528,11 +528,13 @@
                         </div>
                         <div id="twitch-status" class="text-[10px] text-gray-500 mb-2 transition-colors duration-200">Not Connected</div>
                         
-                        <div class="grid grid-cols-2 gap-2 mb-3">
-                            <div><span class="text-[9px] text-gray-400">Normal Cmd</span><input type="text" id="cmd-1" value="!normal"></div>
-                            <div><span class="text-[9px] text-gray-400">Happy Cmd</span><input type="text" id="cmd-2" value="!happy"></div>
-                            <div><span class="text-[9px] text-gray-400">Angry Cmd</span><input type="text" id="cmd-3" value="!angry"></div>
-                            <div><span class="text-[9px] text-gray-400">Sad Cmd</span><input type="text" id="cmd-4" value="!sad"></div>
+                        <div class="text-[9px] text-gray-400 mb-1">Set Chat Cmd AND/OR Reward Trigger Name</div>
+                        
+                        <div class="space-y-2 mb-3">
+                            <div class="flex gap-1"><input type="text" id="cmd-1" placeholder="!normal"><input type="text" id="rwd-1" placeholder="Reward: Normal"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-2" placeholder="!happy"><input type="text" id="rwd-2" placeholder="Reward: Happy"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-3" placeholder="!angry"><input type="text" id="rwd-3" placeholder="Reward: Angry"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-4" placeholder="!sad"><input type="text" id="rwd-4" placeholder="Reward: Sad"></div>
                         </div>
 
                         <!-- Interaction Settings -->
@@ -540,8 +542,11 @@
                             <div class="text-[10px] uppercase font-bold text-gray-500 mb-2">Chat Interactions</div>
                             
                             <!-- Bonk -->
-                            <div class="mb-2 grid grid-cols-[1fr_auto_auto_auto] gap-1">
-                                <input type="text" id="cmd-bonk" value="!bonk" placeholder="Cmd">
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-bonk" class="flex-1" placeholder="Cmd (!bonk)">
+                                <input type="text" id="rwd-bonk" class="flex-1" placeholder="Reward (Bonk)">
+                            </div>
+                            <div class="mb-3 flex gap-1 justify-end">
                                 <div class="file-btn px-2" onclick="document.getElementById('input-bonk-img').click()" title="Img">🖼</div>
                                 <div class="file-btn px-2" onclick="document.getElementById('input-bonk-sfx').click()" title="Sfx">🔊</div>
                                 <button class="btn-test" onclick="triggerBonk()" title="Test">▶</button>
@@ -550,7 +555,7 @@
                             <input type="file" id="input-bonk-sfx" class="hidden" accept="audio/*">
                             
                             <!-- Dizzy (Bonk Effect) -->
-                            <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
+                            <div class="mb-3 grid grid-cols-[1fr_auto_auto] gap-1">
                                 <div class="text-[10px] text-gray-400 flex items-center">💫 Dizzy Particle</div>
                                 <div class="file-btn px-2" onclick="document.getElementById('input-dizzy-img').click()" title="Img">🖼</div>
                                 <div class="file-btn px-2" onclick="document.getElementById('input-dizzy-sfx').click()" title="Sfx">🔊</div>
@@ -559,24 +564,33 @@
                             <input type="file" id="input-dizzy-sfx" class="hidden" accept="audio/*">
 
                             <!-- Throw -->
-                            <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
-                                <input type="text" id="cmd-throw" value="!throw" placeholder="Cmd">
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-throw" class="flex-1" placeholder="Cmd (!throw)">
+                                <input type="text" id="rwd-throw" class="flex-1" placeholder="Reward (Throw)">
+                            </div>
+                            <div class="mb-3 flex gap-1 justify-end">
                                 <div class="file-btn px-2" onclick="document.getElementById('input-throw-img').click()" title="Img">🖼</div>
                                 <button class="btn-test" onclick="triggerThrow()" title="Test">▶</button>
                             </div>
                             <input type="file" id="input-throw-img" class="hidden" accept="image/*">
 
                             <!-- Pat -->
-                            <div class="mb-2 grid grid-cols-[1fr_auto_auto] gap-1">
-                                <input type="text" id="cmd-pat" value="!pat" placeholder="Cmd">
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-pat" class="flex-1" placeholder="Cmd (!pat)">
+                                <input type="text" id="rwd-pat" class="flex-1" placeholder="Reward (Pat)">
+                            </div>
+                            <div class="mb-3 flex gap-1 justify-end">
                                 <div class="file-btn px-2" onclick="document.getElementById('input-pat-img').click()" title="Img">🖼</div>
                                 <button class="btn-test" onclick="triggerPat()" title="Test">▶</button>
                             </div>
                             <input type="file" id="input-pat-img" class="hidden" accept="image/*">
 
                             <!-- Cheer -->
-                            <div class="grid grid-cols-[1fr_auto] gap-1">
-                                <input type="text" id="cmd-cheer" value="!cheer" placeholder="Cmd">
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-cheer" class="flex-1" placeholder="Cmd (!cheer)">
+                                <input type="text" id="rwd-cheer" class="flex-1" placeholder="Reward (Cheer)">
+                            </div>
+                            <div class="flex gap-1 justify-end">
                                 <button class="btn-test" onclick="triggerCheer()" title="Test">▶</button>
                             </div>
                         </div>
@@ -708,19 +722,19 @@
             
             activeMode: 1, 
             modes: {
-                1: { name: 'Normal', idle: ["https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png"], talk: ["https://cdn3.emoji.gg/emojis/9686-blobcat-hyper.gif"] },
-                2: { name: 'Happy', idle: [], talk: [] },
-                3: { name: 'Angry', idle: [], talk: [] },
-                4: { name: 'Sad', idle: [], talk: [] }
+                1: { name: 'Normal', reward: 'Normal', idle: ["https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png"], talk: ["https://cdn3.emoji.gg/emojis/9686-blobcat-hyper.gif"] },
+                2: { name: 'Happy', reward: 'Happy', idle: [], talk: [] },
+                3: { name: 'Angry', reward: 'Angry', idle: [], talk: [] },
+                4: { name: 'Sad', reward: 'Sad', idle: [], talk: [] }
             },
             hotkeys: { 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', 4: 'Digit4' },
             chatCmds: { 1: '!normal', 2: '!happy', 3: '!angry', 4: '!sad' },
             
             // Interaction State
-            bonk: { cmd: '!bonk', img: 'https://cdn3.emoji.gg/emojis/4365-anvil.png', sound: null },
-            throw: { cmd: '!throw', img: 'https://cdn3.emoji.gg/emojis/6429-yeet.png' },
-            pat: { cmd: '!pat', img: 'https://cdn3.emoji.gg/emojis/1376-pat.png' },
-            cheer: { cmd: '!cheer' },
+            bonk: { cmd: '!bonk', reward: 'Bonk', img: 'https://cdn3.emoji.gg/emojis/4365-anvil.png', sound: null },
+            throw: { cmd: '!throw', reward: 'Throw', img: 'https://cdn3.emoji.gg/emojis/6429-yeet.png' },
+            pat: { cmd: '!pat', reward: 'Pat', img: 'https://cdn3.emoji.gg/emojis/1376-pat.png' },
+            cheer: { cmd: '!cheer', reward: 'Cheer' },
             dizzy: { img: 'https://cdn3.emoji.gg/emojis/5684-star.png', sound: null },
             
             isSquashed: false,
@@ -859,7 +873,10 @@
             if(data.hotkeys) state.hotkeys = data.hotkeys;
             if(data.chatCmds) {
                 state.chatCmds = data.chatCmds;
-                [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).value = state.chatCmds[id]);
+                [1,2,3,4].forEach(id => {
+                    document.getElementById(`cmd-${id}`).value = state.chatCmds[id] || '';
+                    document.getElementById(`rwd-${id}`).value = state.modes[id].reward || '';
+                });
             }
             if(data.interactions) {
                 state.bonk = data.interactions.bonk || state.bonk;
@@ -868,10 +885,18 @@
                 state.cheer = data.interactions.cheer || state.cheer;
                 state.dizzy = data.interactions.dizzy || state.dizzy;
 
-                document.getElementById('cmd-bonk').value = state.bonk.cmd;
-                document.getElementById('cmd-throw').value = state.throw.cmd;
-                document.getElementById('cmd-pat').value = state.pat.cmd;
-                document.getElementById('cmd-cheer').value = state.cheer.cmd;
+                // Restore inputs
+                document.getElementById('cmd-bonk').value = state.bonk.cmd || '';
+                document.getElementById('rwd-bonk').value = state.bonk.reward || '';
+                
+                document.getElementById('cmd-throw').value = state.throw.cmd || '';
+                document.getElementById('rwd-throw').value = state.throw.reward || '';
+                
+                document.getElementById('cmd-pat').value = state.pat.cmd || '';
+                document.getElementById('rwd-pat').value = state.pat.reward || '';
+                
+                document.getElementById('cmd-cheer').value = state.cheer.cmd || '';
+                document.getElementById('rwd-cheer').value = state.cheer.reward || '';
                 
                 els.bonkItem.src = state.bonk.img;
                 els.throwItem.src = state.throw.img;
@@ -1183,20 +1208,40 @@
         }
         setupKeyBinders();
 
-        function updateChatCmds() {
+        // Update handlers for both CMD and RWD
+        function updateInputs() {
             [1,2,3,4].forEach(id => {
-                const val = document.getElementById(`cmd-${id}`).value.trim().toLowerCase();
-                if(val) state.chatCmds[id] = val;
+                const cmdVal = document.getElementById(`cmd-${id}`).value.trim().toLowerCase();
+                const rwdVal = document.getElementById(`rwd-${id}`).value.trim();
+                
+                state.chatCmds[id] = cmdVal;
+                state.modes[id].reward = rwdVal;
             });
             saveAuto();
         }
-        [1,2,3,4].forEach(id => document.getElementById(`cmd-${id}`).addEventListener('input', updateChatCmds));
+        [1,2,3,4].forEach(id => {
+            document.getElementById(`cmd-${id}`).addEventListener('input', updateInputs);
+            document.getElementById(`rwd-${id}`).addEventListener('input', updateInputs);
+        });
 
         // --- INTERACTIONS SETUP ---
-        document.getElementById('cmd-bonk').addEventListener('input', (e) => {
-            state.bonk.cmd = e.target.value.trim().toLowerCase();
-            saveAuto();
-        });
+        // Helper to setup listeners for both inputs
+        const setupInteractionListeners = (key) => {
+            document.getElementById(`cmd-${key}`).addEventListener('input', (e) => {
+                state[key].cmd = e.target.value.trim().toLowerCase();
+                saveAuto();
+            });
+            document.getElementById(`rwd-${key}`).addEventListener('input', (e) => {
+                state[key].reward = e.target.value.trim();
+                saveAuto();
+            });
+        };
+        
+        setupInteractionListeners('bonk');
+        setupInteractionListeners('throw');
+        setupInteractionListeners('pat');
+        setupInteractionListeners('cheer');
+
         document.getElementById('input-bonk-img').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if(file) {
@@ -1247,10 +1292,6 @@
             }
         });
 
-        document.getElementById('cmd-throw').addEventListener('input', (e) => {
-            state.throw.cmd = e.target.value.trim().toLowerCase();
-            saveAuto();
-        });
         document.getElementById('input-throw-img').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if(file) {
@@ -1264,10 +1305,6 @@
             }
         });
 
-        document.getElementById('cmd-pat').addEventListener('input', (e) => {
-            state.pat.cmd = e.target.value.trim().toLowerCase();
-            saveAuto();
-        });
         document.getElementById('input-pat-img').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if(file) {
@@ -1279,10 +1316,6 @@
                 };
                 r.readAsDataURL(file);
             }
-        });
-        document.getElementById('cmd-cheer').addEventListener('input', (e) => {
-            state.cheer.cmd = e.target.value.trim().toLowerCase();
-            saveAuto();
         });
 
         // --- ANIMATION TRIGGERS ---
@@ -1403,13 +1436,34 @@
 
         // --- TWITCH INTEGRATION ---
         document.getElementById('btn-twitch-connect').addEventListener('click', () => {
-            const channel = els.twitchChannel.value.trim();
+            let channel = els.twitchChannel.value.trim().toLowerCase();
+            
+            // --- NEW: Sanitize Input ---
+            // Remove common copy-paste artifacts
+            channel = channel.replace("https://", "").replace("http://", "");
+            channel = channel.replace("twitch.tv/", "");
+            channel = channel.replace("@", "");
+            channel = channel.split('/')[0]; // Handle trailing slashes or subpaths
+            
+            // Update the input box to show the sanitized name
+            els.twitchChannel.value = channel;
+
             if(!channel) return alert("Enter a channel name!");
+            
             try { ComfyJS.Disconnect(); } catch(e){}
             
-            // --- NEW: CHANNEL POINT HANDLER ---
+            // --- NEW: CHAT LISTENER FOR DEBUGGING ---
+            ComfyJS.onChat = (user, message, flags, self, extra) => {
+                console.log(`💬 Chat: [${user}] ${message}`);
+                // Debugging: Checking if message has reward ID even if onReward didn't fire
+                if (extra.customRewardId) {
+                    console.log("👉 Message has Reward ID:", extra.customRewardId);
+                }
+            };
+
+            // --- CHANNEL POINT HANDLER ---
             ComfyJS.onReward = (user, reward, cost, message, extra, other) => {
-                console.log("Reward redeemed:", user, reward, cost); // Debugging
+                console.log("🎁 Reward redeemed:", user, reward, cost); 
                 if (!reward) return; // Safety check
                 const rewardName = reward.toLowerCase();
                 
@@ -1417,26 +1471,26 @@
                 els.twitchStatus.style.color = '#fff';
                 setTimeout(() => els.twitchStatus.style.color = '#4ade80', 200);
 
-                // Match specific interactions based on Reward Title
-                if (rewardName.includes('bonk')) triggerBonk();
-                else if (rewardName.includes('throw')) triggerThrow();
-                else if (rewardName.includes('pat')) triggerPat();
-                else if (rewardName.includes('cheer')) triggerCheer();
+                // Check Interactions against User Defined Rewards
+                if (state.bonk.reward && rewardName.includes(state.bonk.reward.toLowerCase())) triggerBonk();
+                else if (state.throw.reward && rewardName.includes(state.throw.reward.toLowerCase())) triggerThrow();
+                else if (state.pat.reward && rewardName.includes(state.pat.reward.toLowerCase())) triggerPat();
+                else if (state.cheer.reward && rewardName.includes(state.cheer.reward.toLowerCase())) triggerCheer();
                 
-                // Match Mode/Emotion names
+                // Check Modes against User Defined Rewards
                 else {
                     for (const [modeId, modeData] of Object.entries(state.modes)) {
-                        if (rewardName.includes(modeData.name.toLowerCase())) {
+                        if (modeData.reward && rewardName.includes(modeData.reward.toLowerCase())) {
                             setMode(parseInt(modeId));
                             document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
                             setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
                         }
                     }
                 }
-                // Note: Rewards bypass cooldowns because they have a cost
             };
 
             ComfyJS.onCommand = (user, command, message, flags, extra) => {
+                console.log(`⚡ Cmd: !${command}`); // Debug log
                 const now = Date.now();
                 const cdMs = (state.settings.cooldown || 0) * 1000;
                 
@@ -1445,7 +1499,7 @@
 
                 const fullCmd = "!" + command.toLowerCase();
 
-                // NEW: !cooldown command (Mod/Broadcaster Only)
+                // !cooldown command (Mod/Broadcaster Only)
                 if (fullCmd === '!cooldown' && (flags.broadcaster || flags.mod)) {
                     const secs = parseInt(message);
                     if (!isNaN(secs) && secs >= 0) {
