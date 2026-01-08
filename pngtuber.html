@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.4</title>
+    <title>Salamander WebTuber v4.9.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.4</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.5</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -603,7 +603,7 @@
                         <span>User Cooldown</span>
                         <span id="val-cooldown" class="text-blue-400">10s</span>
                     </div>
-                    <input type="range" id="slider-cooldown" min="0" max="60" value="10">
+                    <input type="range" id="slider-cooldown" min="0" max="600" value="10">
                 </div>
                 <div>
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
@@ -1322,9 +1322,29 @@
         window.triggerCheer = () => {
             const end = Date.now() + 2000;
             state.isJumping = true;
+            
+            // Brighter colors and larger particles for visibility
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffffff'];
+
             (function frame() {
-                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } });
-                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } });
+                confetti({ 
+                    particleCount: 3, 
+                    angle: 60, 
+                    spread: 55, 
+                    origin: { x: 0, y: 0.7 },
+                    colors: colors,
+                    scalar: 2, // Make particles 2x bigger
+                    startVelocity: 45
+                });
+                confetti({ 
+                    particleCount: 3, 
+                    angle: 120, 
+                    spread: 55, 
+                    origin: { x: 1, y: 0.7 },
+                    colors: colors,
+                    scalar: 2, // Make particles 2x bigger
+                    startVelocity: 45
+                });
                 if (Date.now() < end) requestAnimationFrame(frame);
             }());
             setTimeout(() => { state.isJumping = false; }, 2000);
@@ -1359,13 +1379,27 @@
                 const last = state.userCooldowns[user] || 0;
                 const cdMs = (state.settings.cooldown || 0) * 1000;
 
+                const fullCmd = "!" + command.toLowerCase();
+
+                // NEW: !cooldown command (Mod/Broadcaster Only)
+                if (fullCmd === '!cooldown' && (flags.broadcaster || flags.mod)) {
+                    const secs = parseInt(message);
+                    if (!isNaN(secs) && secs >= 0) {
+                        const newCooldown = Math.min(secs, 600); 
+                        state.settings.cooldown = newCooldown;
+                        els.sliderCooldown.value = newCooldown;
+                        els.valCooldown.innerText = newCooldown + "s";
+                        saveAuto();
+                        return; // Stop processing
+                    }
+                }
+
                 // Check Cooldown (Exempt Broadcasters)
                 if(!flags.broadcaster && (now - last < cdMs)) {
                     console.log(`Ignored command from ${user} (Cooldown active)`);
                     return;
                 }
 
-                const fullCmd = "!" + command.toLowerCase();
                 let triggered = false;
 
                 if(fullCmd === state.bonk.cmd) { triggerBonk(); triggered = true; }
