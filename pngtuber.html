@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.7</title>
+    <title>Salamander WebTuber v4.9.8</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.7</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.8</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -526,7 +526,7 @@
                             <input type="text" id="twitch-channel" placeholder="Channel Name" class="flex-1">
                             <button id="btn-twitch-connect" class="bg-purple-700 hover:bg-purple-600 text-white text-xs px-3 rounded">Connect</button>
                         </div>
-                        <div id="twitch-status" class="text-[10px] text-gray-500 mb-2">Not Connected</div>
+                        <div id="twitch-status" class="text-[10px] text-gray-500 mb-2 transition-colors duration-200">Not Connected</div>
                         
                         <div class="grid grid-cols-2 gap-2 mb-3">
                             <div><span class="text-[9px] text-gray-400">Normal Cmd</span><input type="text" id="cmd-1" value="!normal"></div>
@@ -1409,8 +1409,14 @@
             
             // --- NEW: CHANNEL POINT HANDLER ---
             ComfyJS.onReward = (user, reward, cost, message, extra, other) => {
+                console.log("Reward redeemed:", user, reward, cost); // Debugging
+                if (!reward) return; // Safety check
                 const rewardName = reward.toLowerCase();
                 
+                // Flash Status to show activity
+                els.twitchStatus.style.color = '#fff';
+                setTimeout(() => els.twitchStatus.style.color = '#4ade80', 200);
+
                 // Match specific interactions based on Reward Title
                 if (rewardName.includes('bonk')) triggerBonk();
                 else if (rewardName.includes('throw')) triggerThrow();
@@ -1479,6 +1485,10 @@
                 if (triggered) {
                     state.userCooldowns[user] = now;
                     state.globalCooldown = now;
+                    
+                    // Also Flash status for commands
+                    els.twitchStatus.style.color = '#fff';
+                    setTimeout(() => els.twitchStatus.style.color = '#4ade80', 200);
                 }
             };
 
