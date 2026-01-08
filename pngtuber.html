@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.10</title>
+    <title>Salamander WebTuber v4.9.11</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.10</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.11</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -528,13 +528,13 @@
                         </div>
                         <div id="twitch-status" class="text-[10px] text-gray-500 mb-2 transition-colors duration-200">Not Connected</div>
                         
-                        <div class="text-[9px] text-gray-400 mb-1">Set Chat Cmd AND/OR Reward Trigger Name</div>
+                        <div class="text-[9px] text-gray-400 mb-1">Set Chat Cmd AND/OR Reward ID/Name</div>
                         
                         <div class="space-y-2 mb-3">
-                            <div class="flex gap-1"><input type="text" id="cmd-1" placeholder="!normal"><input type="text" id="rwd-1" placeholder="Reward: Normal"></div>
-                            <div class="flex gap-1"><input type="text" id="cmd-2" placeholder="!happy"><input type="text" id="rwd-2" placeholder="Reward: Happy"></div>
-                            <div class="flex gap-1"><input type="text" id="cmd-3" placeholder="!angry"><input type="text" id="rwd-3" placeholder="Reward: Angry"></div>
-                            <div class="flex gap-1"><input type="text" id="cmd-4" placeholder="!sad"><input type="text" id="rwd-4" placeholder="Reward: Sad"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-1" placeholder="!normal"><input type="text" id="rwd-1" placeholder="Reward ID/Name"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-2" placeholder="!happy"><input type="text" id="rwd-2" placeholder="Reward ID/Name"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-3" placeholder="!angry"><input type="text" id="rwd-3" placeholder="Reward ID/Name"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-4" placeholder="!sad"><input type="text" id="rwd-4" placeholder="Reward ID/Name"></div>
                         </div>
 
                         <!-- Interaction Settings -->
@@ -544,7 +544,7 @@
                             <!-- Bonk -->
                             <div class="mb-1 flex gap-1">
                                 <input type="text" id="cmd-bonk" class="flex-1" placeholder="Cmd (!bonk)">
-                                <input type="text" id="rwd-bonk" class="flex-1" placeholder="Reward (Bonk)">
+                                <input type="text" id="rwd-bonk" class="flex-1" placeholder="Reward ID/Name">
                             </div>
                             <div class="mb-3 flex gap-1 justify-end">
                                 <div class="file-btn px-2" onclick="document.getElementById('input-bonk-img').click()" title="Img">🖼</div>
@@ -566,7 +566,7 @@
                             <!-- Throw -->
                             <div class="mb-1 flex gap-1">
                                 <input type="text" id="cmd-throw" class="flex-1" placeholder="Cmd (!throw)">
-                                <input type="text" id="rwd-throw" class="flex-1" placeholder="Reward (Throw)">
+                                <input type="text" id="rwd-throw" class="flex-1" placeholder="Reward ID/Name">
                             </div>
                             <div class="mb-3 flex gap-1 justify-end">
                                 <div class="file-btn px-2" onclick="document.getElementById('input-throw-img').click()" title="Img">🖼</div>
@@ -577,7 +577,7 @@
                             <!-- Pat -->
                             <div class="mb-1 flex gap-1">
                                 <input type="text" id="cmd-pat" class="flex-1" placeholder="Cmd (!pat)">
-                                <input type="text" id="rwd-pat" class="flex-1" placeholder="Reward (Pat)">
+                                <input type="text" id="rwd-pat" class="flex-1" placeholder="Reward ID/Name">
                             </div>
                             <div class="mb-3 flex gap-1 justify-end">
                                 <div class="file-btn px-2" onclick="document.getElementById('input-pat-img').click()" title="Img">🖼</div>
@@ -588,7 +588,7 @@
                             <!-- Cheer -->
                             <div class="mb-1 flex gap-1">
                                 <input type="text" id="cmd-cheer" class="flex-1" placeholder="Cmd (!cheer)">
-                                <input type="text" id="rwd-cheer" class="flex-1" placeholder="Reward (Cheer)">
+                                <input type="text" id="rwd-cheer" class="flex-1" placeholder="Reward ID/Name">
                             </div>
                             <div class="flex gap-1 justify-end">
                                 <button class="btn-test" onclick="triggerCheer()" title="Test">▶</button>
@@ -1452,41 +1452,59 @@
             
             try { ComfyJS.Disconnect(); } catch(e){}
             
-            // --- NEW: CHAT LISTENER FOR DEBUGGING ---
-            ComfyJS.onChat = (user, message, flags, self, extra) => {
-                console.log(`💬 Chat: [${user}] ${message}`);
-                // Debugging: Checking if message has reward ID even if onReward didn't fire
-                if (extra.customRewardId) {
-                    console.log("👉 Message has Reward ID:", extra.customRewardId);
+            // Common function to handle reward triggering
+            const handleRewardTrigger = (rewardName, rewardId) => {
+                // Normalize inputs
+                const rName = rewardName ? rewardName.toLowerCase() : "";
+                const rId = rewardId || "";
+
+                // Helper to check against settings
+                const match = (setting) => {
+                    if (!setting) return false;
+                    const s = setting.toLowerCase();
+                    // Match ID exact or Name partial
+                    return s === rId || (rName && rName.includes(s));
                 }
-            };
 
-            // --- CHANNEL POINT HANDLER ---
-            ComfyJS.onReward = (user, reward, cost, message, extra, other) => {
-                console.log("🎁 Reward redeemed:", user, reward, cost); 
-                if (!reward) return; // Safety check
-                const rewardName = reward.toLowerCase();
+                // Check Interactions
+                if (match(state.bonk.reward)) triggerBonk();
+                else if (match(state.throw.reward)) triggerThrow();
+                else if (match(state.pat.reward)) triggerPat();
+                else if (match(state.cheer.reward)) triggerCheer();
                 
-                // Flash Status to show activity
-                els.twitchStatus.style.color = '#fff';
-                setTimeout(() => els.twitchStatus.style.color = '#4ade80', 200);
-
-                // Check Interactions against User Defined Rewards
-                if (state.bonk.reward && rewardName.includes(state.bonk.reward.toLowerCase())) triggerBonk();
-                else if (state.throw.reward && rewardName.includes(state.throw.reward.toLowerCase())) triggerThrow();
-                else if (state.pat.reward && rewardName.includes(state.pat.reward.toLowerCase())) triggerPat();
-                else if (state.cheer.reward && rewardName.includes(state.cheer.reward.toLowerCase())) triggerCheer();
-                
-                // Check Modes against User Defined Rewards
+                // Check Modes
                 else {
                     for (const [modeId, modeData] of Object.entries(state.modes)) {
-                        if (modeData.reward && rewardName.includes(modeData.reward.toLowerCase())) {
+                        if (match(modeData.reward)) {
                             setMode(parseInt(modeId));
                             document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
                             setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
                         }
                     }
                 }
+            };
+
+            // --- NEW: CHAT LISTENER FOR DEBUGGING & ID TRIGGERING ---
+            ComfyJS.onChat = (user, message, flags, self, extra) => {
+                console.log(`💬 Chat: [${user}] ${message}`);
+                
+                if (extra.customRewardId) {
+                    console.log("👉 Message has Reward ID:", extra.customRewardId);
+                    // Trigger logic moved here to support IDs on anonymous connections
+                    handleRewardTrigger(null, extra.customRewardId);
+                }
+            };
+
+            // --- CHANNEL POINT HANDLER ---
+            ComfyJS.onReward = (user, reward, cost, message, extra, other) => {
+                console.log("🎁 Reward redeemed:", user, reward, cost); 
+                // Flash Status
+                els.twitchStatus.style.color = '#fff';
+                setTimeout(() => els.twitchStatus.style.color = '#4ade80', 200);
+                
+                // Use the common handler
+                // extra.customRewardId is usually available here too
+                handleRewardTrigger(reward, extra.customRewardId);
             };
 
             ComfyJS.onCommand = (user, command, message, flags, extra) => {
