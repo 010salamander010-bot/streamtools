@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.6</title>
+    <title>Salamander WebTuber v4.9.7</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.6</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.7</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -609,10 +609,16 @@
                 <!-- NEW: Cooldown & Volume -->
                 <div>
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
-                        <span>User Cooldown</span>
+                        <span>Cooldown</span>
                         <span id="val-cooldown" class="text-blue-400">10s</span>
                     </div>
-                    <input type="range" id="slider-cooldown" min="0" max="600" value="10">
+                    <div class="flex items-center gap-2 mb-2">
+                        <input type="range" id="slider-cooldown" min="0" max="600" value="10" class="flex-1">
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] text-gray-400">
+                        <input type="checkbox" id="chk-global-cooldown" class="accent-blue-500">
+                        <span>Global Cooldown (Applies to everyone)</span>
+                    </div>
                 </div>
                 <div>
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
@@ -739,8 +745,10 @@
             
             // NEW: Anti-Spam & Volume
             userCooldowns: {}, // Map of username -> timestamp
+            globalCooldown: 0, // Global timestamp
             settings: {
                 cooldown: 10, // seconds
+                globalCooldownMode: false,
                 sfxVolume: 0.5, // 0.0 to 1.0
                 shoutThreshold: 80
             },
@@ -785,6 +793,8 @@
             // NEW UI
             sliderCooldown: document.getElementById('slider-cooldown'),
             valCooldown: document.getElementById('val-cooldown'),
+            chkGlobalCooldown: document.getElementById('chk-global-cooldown'),
+            
             sliderSfx: document.getElementById('slider-sfx'),
             valSfx: document.getElementById('val-sfx'),
             sliderShout: document.getElementById('slider-shout'),
@@ -831,6 +841,7 @@
                     twitchChannel: els.twitchChannel.value,
                     // NEW Settings
                     cooldown: els.sliderCooldown.value,
+                    globalCooldownMode: els.chkGlobalCooldown.checked,
                     sfxVolume: els.sliderSfx.value,
                     shoutThreshold: els.sliderShout.value
                 },
@@ -882,6 +893,9 @@
                 state.settings.cooldown = data.settings.cooldown || 10;
                 els.sliderCooldown.value = state.settings.cooldown;
                 els.valCooldown.innerText = state.settings.cooldown + "s";
+                
+                state.settings.globalCooldownMode = data.settings.globalCooldownMode || false;
+                els.chkGlobalCooldown.checked = state.settings.globalCooldownMode;
 
                 state.settings.sfxVolume = (data.settings.sfxVolume !== undefined) ? data.settings.sfxVolume : 50;
                 els.sliderSfx.value = state.settings.sfxVolume;
@@ -929,6 +943,7 @@
         function saveAuto() {
             // Update State from UI
             state.settings.cooldown = parseInt(els.sliderCooldown.value);
+            state.settings.globalCooldownMode = els.chkGlobalCooldown.checked;
             state.settings.sfxVolume = parseInt(els.sliderSfx.value);
             state.settings.shoutThreshold = parseInt(els.sliderShout.value);
 
@@ -1392,10 +1407,35 @@
             if(!channel) return alert("Enter a channel name!");
             try { ComfyJS.Disconnect(); } catch(e){}
             
+            // --- NEW: CHANNEL POINT HANDLER ---
+            ComfyJS.onReward = (user, reward, cost, message, extra, other) => {
+                const rewardName = reward.toLowerCase();
+                
+                // Match specific interactions based on Reward Title
+                if (rewardName.includes('bonk')) triggerBonk();
+                else if (rewardName.includes('throw')) triggerThrow();
+                else if (rewardName.includes('pat')) triggerPat();
+                else if (rewardName.includes('cheer')) triggerCheer();
+                
+                // Match Mode/Emotion names
+                else {
+                    for (const [modeId, modeData] of Object.entries(state.modes)) {
+                        if (rewardName.includes(modeData.name.toLowerCase())) {
+                            setMode(parseInt(modeId));
+                            document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
+                            setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
+                        }
+                    }
+                }
+                // Note: Rewards bypass cooldowns because they have a cost
+            };
+
             ComfyJS.onCommand = (user, command, message, flags, extra) => {
                 const now = Date.now();
-                const last = state.userCooldowns[user] || 0;
                 const cdMs = (state.settings.cooldown || 0) * 1000;
+                
+                // Determine last usage time based on mode (Global vs User)
+                const lastUsage = state.settings.globalCooldownMode ? state.globalCooldown : (state.userCooldowns[user] || 0);
 
                 const fullCmd = "!" + command.toLowerCase();
 
@@ -1413,20 +1453,20 @@
                 }
 
                 // Check Cooldown (Exempt Broadcasters)
-                if(!flags.broadcaster && (now - last < cdMs)) {
+                if(!flags.broadcaster && (now - lastUsage < cdMs)) {
                     console.log(`Ignored command from ${user} (Cooldown active)`);
                     return;
                 }
 
                 let triggered = false;
 
-                if(fullCmd === state.bonk.cmd) { triggerBonk(); triggered = true; }
-                else if(fullCmd === state.throw.cmd) { triggerThrow(); triggered = true; }
-                else if(fullCmd === state.pat.cmd) { triggerPat(); triggered = true; }
-                else if(fullCmd === state.cheer.cmd) { triggerCheer(); triggered = true; }
+                if(state.bonk.cmd && fullCmd === state.bonk.cmd) { triggerBonk(); triggered = true; }
+                else if(state.throw.cmd && fullCmd === state.throw.cmd) { triggerThrow(); triggered = true; }
+                else if(state.pat.cmd && fullCmd === state.pat.cmd) { triggerPat(); triggered = true; }
+                else if(state.cheer.cmd && fullCmd === state.cheer.cmd) { triggerCheer(); triggered = true; }
                 else {
                     for (const [modeId, trigger] of Object.entries(state.chatCmds)) {
-                        if (trigger === fullCmd) {
+                        if (trigger && trigger === fullCmd) {
                             setMode(parseInt(modeId));
                             document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
                             setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
@@ -1438,6 +1478,7 @@
                 // Only update cooldown if a valid command was actually triggered
                 if (triggered) {
                     state.userCooldowns[user] = now;
+                    state.globalCooldown = now;
                 }
             };
 
@@ -1673,6 +1714,7 @@
         els.sliderShout.addEventListener('input', (e) => els.valShout.innerText = e.target.value);
         
         els.sliderCooldown.addEventListener('change', saveAuto);
+        els.chkGlobalCooldown.addEventListener('change', saveAuto);
         els.sliderSfx.addEventListener('change', saveAuto);
         els.sliderShout.addEventListener('change', saveAuto);
 
