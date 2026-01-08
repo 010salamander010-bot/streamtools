@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.3</title>
+    <title>Salamander WebTuber v4.9.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.3</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.4</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -597,6 +597,22 @@
                     <input type="range" id="slider-threshold" min="1" max="100" value="15">
                 </div>
                 
+                <!-- NEW: Cooldown & Volume -->
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>User Cooldown</span>
+                        <span id="val-cooldown" class="text-blue-400">10s</span>
+                    </div>
+                    <input type="range" id="slider-cooldown" min="0" max="60" value="10">
+                </div>
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>SFX Volume</span>
+                        <span id="val-sfx" class="text-blue-400">50%</span>
+                    </div>
+                    <input type="range" id="slider-sfx" min="0" max="100" value="50">
+                </div>
+
                 <details>
                     <summary class="flex justify-between items-center bg-gray-800 p-2 rounded">
                         <span>🛠 Animation Tuning</span>
@@ -712,7 +728,14 @@
             randomTalk: true,
             isLocked: false,
             
-            // Layout (Now includes props arrays)
+            // NEW: Anti-Spam & Volume
+            userCooldowns: {}, // Map of username -> timestamp
+            settings: {
+                cooldown: 10, // seconds
+                sfxVolume: 0.5 // 0.0 to 1.0
+            },
+
+            // Layout
             layout: { 
                 avatar: { x: 0, y: 0, scale: 1 }, 
                 bg: { x: 0, y: 0, scale: 1, flip: false },
@@ -748,13 +771,19 @@
             speedIdle: document.getElementById('slider-speed-idle'),
             speedTalk: document.getElementById('slider-speed-talk'),
             zoom: document.getElementById('slider-zoom'),
+            
+            // NEW UI
+            sliderCooldown: document.getElementById('slider-cooldown'),
+            valCooldown: document.getElementById('val-cooldown'),
+            sliderSfx: document.getElementById('slider-sfx'),
+            valSfx: document.getElementById('val-sfx'),
+
             bgColor: document.getElementById('bg-color-picker'),
             randomTalk: document.getElementById('chk-random-talk'),
             audioSelect: document.getElementById('audio-device-select'),
             btnLock: document.getElementById('btn-lock'),
             twitchChannel: document.getElementById('twitch-channel'),
             twitchStatus: document.getElementById('twitch-status'),
-            btnLayerStatic: document.getElementById('btn-layer-static')
         };
 
         // --- INIT STARS ---
@@ -787,7 +816,10 @@
                     enableShake: state.enableShake,
                     randomTalk: state.randomTalk,
                     bgColor: els.bgColor.value,
-                    twitchChannel: els.twitchChannel.value
+                    twitchChannel: els.twitchChannel.value,
+                    // NEW Settings
+                    cooldown: els.sliderCooldown.value,
+                    sfxVolume: els.sliderSfx.value
                 },
                 layout: {
                     avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
@@ -833,6 +865,15 @@
                 els.stage.style.backgroundColor = els.bgColor.value;
                 els.twitchChannel.value = data.settings.twitchChannel || '';
                 
+                // NEW: Restore new settings
+                state.settings.cooldown = data.settings.cooldown || 10;
+                els.sliderCooldown.value = state.settings.cooldown;
+                els.valCooldown.innerText = state.settings.cooldown + "s";
+
+                state.settings.sfxVolume = (data.settings.sfxVolume !== undefined) ? data.settings.sfxVolume : 50;
+                els.sliderSfx.value = state.settings.sfxVolume;
+                els.valSfx.innerText = state.settings.sfxVolume + "%";
+                
                 state.enableSwear = data.settings.enableSwear;
                 state.enableShake = data.settings.enableShake;
                 state.randomTalk = data.settings.randomTalk;
@@ -869,6 +910,10 @@
         }
 
         function saveAuto() {
+            // Update State from UI
+            state.settings.cooldown = parseInt(els.sliderCooldown.value);
+            state.settings.sfxVolume = parseInt(els.sliderSfx.value);
+
             // Sync Static Props DOM Styles
             state.layout.propsStatic.forEach(prop => {
                 const el = document.getElementById(`prop-${prop.id}`);
@@ -1210,7 +1255,11 @@
         // --- ANIMATION TRIGGERS ---
         window.triggerBonk = () => {
             if(state.isSquashed) return; 
-            if(state.bonk.sound) new Audio(state.bonk.sound).play();
+            if(state.bonk.sound) {
+                const audio = new Audio(state.bonk.sound);
+                audio.volume = state.settings.sfxVolume / 100;
+                audio.play();
+            }
             els.bonkItem.style.display = 'block';
             els.bonkItem.classList.add('anim-drop');
             setTimeout(() => {
@@ -1221,6 +1270,7 @@
                 if (state.dizzy.sound) {
                     state.dizzyAudio = new Audio(state.dizzy.sound);
                     state.dizzyAudio.loop = true;
+                    state.dizzyAudio.volume = state.settings.sfxVolume / 100;
                     state.dizzyAudio.play();
                 }
 
@@ -1303,20 +1353,42 @@
             const channel = els.twitchChannel.value.trim();
             if(!channel) return alert("Enter a channel name!");
             try { ComfyJS.Disconnect(); } catch(e){}
+            
             ComfyJS.onCommand = (user, command, message, flags, extra) => {
+                const now = Date.now();
+                const last = state.userCooldowns[user] || 0;
+                const cdMs = (state.settings.cooldown || 0) * 1000;
+
+                // Check Cooldown (Exempt Broadcasters)
+                if(!flags.broadcaster && (now - last < cdMs)) {
+                    console.log(`Ignored command from ${user} (Cooldown active)`);
+                    return;
+                }
+
                 const fullCmd = "!" + command.toLowerCase();
-                if(fullCmd === state.bonk.cmd) return triggerBonk();
-                if(fullCmd === state.throw.cmd) return triggerThrow();
-                if(fullCmd === state.pat.cmd) return triggerPat();
-                if(fullCmd === state.cheer.cmd) return triggerCheer();
-                for (const [modeId, trigger] of Object.entries(state.chatCmds)) {
-                    if (trigger === fullCmd) {
-                        setMode(parseInt(modeId));
-                        document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
-                        setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
+                let triggered = false;
+
+                if(fullCmd === state.bonk.cmd) { triggerBonk(); triggered = true; }
+                else if(fullCmd === state.throw.cmd) { triggerThrow(); triggered = true; }
+                else if(fullCmd === state.pat.cmd) { triggerPat(); triggered = true; }
+                else if(fullCmd === state.cheer.cmd) { triggerCheer(); triggered = true; }
+                else {
+                    for (const [modeId, trigger] of Object.entries(state.chatCmds)) {
+                        if (trigger === fullCmd) {
+                            setMode(parseInt(modeId));
+                            document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
+                            setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
+                            triggered = true;
+                        }
                     }
                 }
+
+                // Only update cooldown if a valid command was actually triggered
+                if (triggered) {
+                    state.userCooldowns[user] = now;
+                }
             };
+
             ComfyJS.onConnected = () => {
                 els.twitchStatus.innerText = "✅ Connected to " + channel;
                 els.twitchStatus.classList.add('text-green-400');
@@ -1542,6 +1614,12 @@
             loadAuto();
             if (localStorage.getItem('webTuber_micPermission') === 'true') startMicrophone();
         });
+
+        // NEW: Listeners for new sliders
+        els.sliderCooldown.addEventListener('input', (e) => els.valCooldown.innerText = e.target.value + "s");
+        els.sliderSfx.addEventListener('input', (e) => els.valSfx.innerText = e.target.value + "%");
+        els.sliderCooldown.addEventListener('change', saveAuto);
+        els.sliderSfx.addEventListener('change', saveAuto);
 
         function animate() {
             requestAnimationFrame(animate);
