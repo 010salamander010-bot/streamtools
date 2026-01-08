@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salamander WebTuber v4.9.5</title>
+    <title>Salamander WebTuber v4.9.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
@@ -409,7 +409,7 @@
     <!-- Controls -->
     <div id="controls">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.5</span></h1>
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.6</span></h1>
             <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
         </div>
 
@@ -591,12 +591,21 @@
             <div class="space-y-4">
                 <div>
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
-                        <span>Mic Sensitivity</span>
-                        <span id="vol-meter" class="text-green-400 font-mono">0</span>
+                        <span>Mic Volume / Talk Thresh</span>
+                        <span id="vol-meter" class="text-green-400 font-mono">0 / 80</span>
                     </div>
                     <input type="range" id="slider-threshold" min="1" max="100" value="15">
                 </div>
                 
+                <!-- NEW: Shout Threshold -->
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>Shout Threshold</span>
+                        <span id="val-shout" class="text-red-400">80</span>
+                    </div>
+                    <input type="range" id="slider-shout" min="1" max="100" value="80">
+                </div>
+
                 <!-- NEW: Cooldown & Volume -->
                 <div>
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
@@ -732,7 +741,8 @@
             userCooldowns: {}, // Map of username -> timestamp
             settings: {
                 cooldown: 10, // seconds
-                sfxVolume: 0.5 // 0.0 to 1.0
+                sfxVolume: 0.5, // 0.0 to 1.0
+                shoutThreshold: 80
             },
 
             // Layout
@@ -777,6 +787,8 @@
             valCooldown: document.getElementById('val-cooldown'),
             sliderSfx: document.getElementById('slider-sfx'),
             valSfx: document.getElementById('val-sfx'),
+            sliderShout: document.getElementById('slider-shout'),
+            valShout: document.getElementById('val-shout'),
 
             bgColor: document.getElementById('bg-color-picker'),
             randomTalk: document.getElementById('chk-random-talk'),
@@ -819,7 +831,8 @@
                     twitchChannel: els.twitchChannel.value,
                     // NEW Settings
                     cooldown: els.sliderCooldown.value,
-                    sfxVolume: els.sliderSfx.value
+                    sfxVolume: els.sliderSfx.value,
+                    shoutThreshold: els.sliderShout.value
                 },
                 layout: {
                     avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
@@ -873,6 +886,10 @@
                 state.settings.sfxVolume = (data.settings.sfxVolume !== undefined) ? data.settings.sfxVolume : 50;
                 els.sliderSfx.value = state.settings.sfxVolume;
                 els.valSfx.innerText = state.settings.sfxVolume + "%";
+
+                state.settings.shoutThreshold = (data.settings.shoutThreshold !== undefined) ? data.settings.shoutThreshold : 80;
+                els.sliderShout.value = state.settings.shoutThreshold;
+                els.valShout.innerText = state.settings.shoutThreshold;
                 
                 state.enableSwear = data.settings.enableSwear;
                 state.enableShake = data.settings.enableShake;
@@ -913,6 +930,7 @@
             // Update State from UI
             state.settings.cooldown = parseInt(els.sliderCooldown.value);
             state.settings.sfxVolume = parseInt(els.sliderSfx.value);
+            state.settings.shoutThreshold = parseInt(els.sliderShout.value);
 
             // Sync Static Props DOM Styles
             state.layout.propsStatic.forEach(prop => {
@@ -1652,8 +1670,11 @@
         // NEW: Listeners for new sliders
         els.sliderCooldown.addEventListener('input', (e) => els.valCooldown.innerText = e.target.value + "s");
         els.sliderSfx.addEventListener('input', (e) => els.valSfx.innerText = e.target.value + "%");
+        els.sliderShout.addEventListener('input', (e) => els.valShout.innerText = e.target.value);
+        
         els.sliderCooldown.addEventListener('change', saveAuto);
         els.sliderSfx.addEventListener('change', saveAuto);
+        els.sliderShout.addEventListener('change', saveAuto);
 
         function animate() {
             requestAnimationFrame(animate);
@@ -1663,13 +1684,17 @@
                 for(let i = 0; i < state.dataArray.length; i++) sum += state.dataArray[i];
                 const average = sum / state.dataArray.length;
                 state.volume = state.volume * 0.8 + average * 0.2;
-                els.volMeter.innerText = Math.floor(state.volume);
+                
+                // Update text to show current vs shout threshold
+                els.volMeter.innerText = `${Math.floor(state.volume)} / ${state.settings.shoutThreshold}`;
             }
 
             const threshold = parseInt(els.threshold.value);
             const wasTalking = state.isTalking;
             state.isTalking = state.volume > threshold;
-            state.isShouting = state.volume > (threshold * 2.5) || state.volume > 80;
+            
+            // Shout Logic updated to use separate threshold
+            state.isShouting = state.volume > state.settings.shoutThreshold;
 
             if (wasTalking !== state.isTalking) {
                 state.currentFrameIndex = 0;
