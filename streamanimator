@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Animator Overlay</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: rgba(0, 0, 0, 0); /* Transparent for OBS */
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        /* The container that holds the image */
+        #stage {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        /* The image itself */
+        #target-image {
+            max-width: 80vw;
+            max-height: 80vh;
+            opacity: 0; /* Hidden by default */
+            /* We use a transition for smooth animation */
+            transition-property: transform, opacity;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* UI Panel */
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 320px;
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            z-index: 50;
+            max-height: 90vh;
+            overflow-y: auto;
+            pointer-events: auto;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        
+        /* Hidden UI state for OBS recording if needed */
+        .hide-ui #controls {
+            opacity: 0;
+            transform: translateX(-350px);
+            pointer-events: none;
+        }
+
+        /* Form Elements */
+        label { display: block; font-size: 11px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px; font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: #3b82f6; height: 4px; background: #374151; border-radius: 2px; }
+        select, input[type="text"] { 
+            width: 100%; background: #1f2937; border: 1px solid #4b5563; 
+            color: white; padding: 6px; border-radius: 6px; font-size: 13px; outline: none; 
+        }
+        select:focus, input:focus { border-color: #3b82f6; }
+
+        .btn {
+            background: #2563eb; color: white; padding: 8px 16px; border-radius: 6px; 
+            font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn:hover { background: #1d4ed8; }
+        .btn-secondary { background: #374151; border: 1px solid #4b5563; }
+        .btn-secondary:hover { background: #4b5563; border-color: #9ca3af; }
+        
+        .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #374151; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #3b82f6; }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        /* Animation Classes */
+        /* These define where the image starts when it is "OUT" */
+        .pos-center { transform: translate(0, 0) scale(0.9); }
+        .pos-left   { transform: translate(-100vw, 0); }
+        .pos-right  { transform: translate(100vw, 0); }
+        .pos-top    { transform: translate(0, -100vh); }
+        .pos-bottom { transform: translate(0, 100vh); }
+        
+        /* Active state (On Screen) */
+        .active-state { transform: translate(0, 0) scale(1) !important; opacity: 1 !important; }
+    </style>
+</head>
+<body>
+
+    <!-- STAGE -->
+    <div id="stage">
+        <img id="target-image" src="" alt="Overlay">
+    </div>
+
+    <!-- CONTROLS -->
+    <div id="controls">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="font-bold text-lg"><i class="fa-solid fa-stopwatch text-blue-500 mr-2"></i>Stream Animator</h1>
+            <button onclick="toggleUI()" class="text-gray-500 hover:text-white" title="Hide UI (Press H)">
+                <i class="fa-solid fa-eye-slash"></i>
+            </button>
+        </div>
+
+        <!-- 1. Content -->
+        <div class="mb-6 border-b border-gray-700 pb-6">
+            <label>Image Source</label>
+            <div class="flex gap-2">
+                <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleImageUpload(this)">
+                <button onclick="document.getElementById('file-input').click()" class="btn btn-secondary flex-1">
+                    <i class="fa-regular fa-image"></i> Select Image
+                </button>
+                <button onclick="clearImage()" class="btn btn-secondary w-10 !px-0 bg-red-900/30 border-red-900 hover:bg-red-900">
+                    <i class="fa-solid fa-trash text-red-400"></i>
+                </button>
+            </div>
+            <p id="file-name" class="text-xs text-gray-500 mt-2 truncate italic">No image selected</p>
+        </div>
+
+        <!-- 2. Animation Config -->
+        <div class="mb-6 border-b border-gray-700 pb-6 space-y-4">
+            <div>
+                <label>Animation Style</label>
+                <select id="anim-style" onchange="updateSettings()">
+                    <option value="fade">Fade In / Out</option>
+                    <option value="left">Slide from Left</option>
+                    <option value="right">Slide from Right</option>
+                    <option value="top">Slide from Top</option>
+                    <option value="bottom">Slide from Bottom</option>
+                    <option value="zoom">Pop / Zoom</option>
+                </select>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label>Anim Speed</label>
+                    <div class="flex items-center gap-2">
+                        <input type="range" id="anim-duration" min="0.1" max="5" step="0.1" value="1" oninput="updateSettings()">
+                        <span id="val-duration" class="text-xs w-8">1.0s</span>
+                    </div>
+                </div>
+                <div>
+                    <label>Image Scale</label>
+                    <div class="flex items-center gap-2">
+                        <input type="range" id="img-scale" min="0.1" max="5" step="0.1" value="1" oninput="updateSettings()">
+                        <span id="val-scale" class="text-xs w-8">1.0x</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Timer Loop -->
+        <div class="mb-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <label class="mb-0 text-white">Loop Timer</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="loop-enabled" onchange="toggleLoop()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="p-3 bg-gray-800 rounded border border-gray-700 space-y-3">
+                <div>
+                    <div class="flex justify-between">
+                        <label>Visible Time (Show)</label>
+                        <span id="val-show" class="text-xs text-green-400">5s</span>
+                    </div>
+                    <input type="range" id="time-show" min="1" max="60" step="1" value="5" oninput="updateSettings()">
+                </div>
+                
+                <div>
+                    <div class="flex justify-between">
+                        <label>Interval (Hide)</label>
+                        <span id="val-hide" class="text-xs text-blue-400">10s</span>
+                    </div>
+                    <input type="range" id="time-hide" min="1" max="300" step="5" value="10" oninput="updateSettings()">
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Manual Controls -->
+        <div class="flex gap-2">
+            <button id="btn-trigger" onclick="manualTrigger()" class="btn flex-1">
+                <i class="fa-solid fa-play"></i> Show Now
+            </button>
+            <button onclick="resetState()" class="btn btn-secondary" title="Reset / Hide">
+                <i class="fa-solid fa-stop"></i>
+            </button>
+        </div>
+        
+        <div id="status-bar" class="mt-4 text-center text-xs text-gray-500 font-mono">
+            State: IDLE
+        </div>
+    </div>
+
+    <script>
+        // State
+        const state = {
+            imageSrc: '',
+            animation: 'left',
+            duration: 1.0, // Animation speed
+            scale: 1.0,
+            loopEnabled: false,
+            timeShow: 5, // Seconds to stay on screen
+            timeHide: 10, // Seconds to wait off screen
+            
+            // Internal logic
+            timeout: null,
+            isVisible: false
+        };
+
+        const els = {
+            img: document.getElementById('target-image'),
+            fileName: document.getElementById('file-name'),
+            animStyle: document.getElementById('anim-style'),
+            animDuration: document.getElementById('anim-duration'),
+            valDuration: document.getElementById('val-duration'),
+            imgScale: document.getElementById('img-scale'),
+            valScale: document.getElementById('val-scale'),
+            loopEnabled: document.getElementById('loop-enabled'),
+            timeShow: document.getElementById('time-show'),
+            valShow: document.getElementById('val-show'),
+            timeHide: document.getElementById('time-hide'),
+            valHide: document.getElementById('val-hide'),
+            status: document.getElementById('status-bar')
+        };
+
+        // --- Core Functions ---
+
+        function init() {
+            loadSettings();
+            updateStyles();
+            
+            // Keyboard shortcut for UI
+            window.addEventListener('keydown', (e) => {
+                if(e.key.toLowerCase() === 'h') toggleUI();
+            });
+
+            if(state.loopEnabled) startLoop();
+        }
+
+        function updateSettings() {
+            // Read from UI
+            state.animation = els.animStyle.value;
+            state.duration = parseFloat(els.animDuration.value);
+            state.scale = parseFloat(els.imgScale.value);
+            state.timeShow = parseInt(els.timeShow.value);
+            state.timeHide = parseInt(els.timeHide.value);
+
+            // Update UI Labels
+            els.valDuration.innerText = state.duration.toFixed(1) + 's';
+            els.valScale.innerText = state.scale.toFixed(1) + 'x';
+            els.valShow.innerText = state.timeShow + 's';
+            els.valHide.innerText = state.timeHide + 's';
+
+            // Apply immediately
+            updateStyles();
+            saveSettings();
+        }
+
+        function updateStyles() {
+            // Set transition speed
+            els.img.style.transitionDuration = `${state.duration}s`;
+            
+            // If currently hidden, update the "Resting" position immediately
+            if (!state.isVisible) {
+                applyHiddenState();
+            } else {
+                // If visible, just ensure scale is correct
+                els.img.style.transform = `translate(0, 0) scale(${state.scale})`;
+            }
+        }
+
+        function applyHiddenState() {
+            els.img.classList.remove('active-state');
+            
+            // Remove old pos classes
+            els.img.classList.remove('pos-left', 'pos-right', 'pos-top', 'pos-bottom', 'pos-center');
+            els.img.style.transform = ''; // Clear inline transform to allow class to work
+            
+            // Add specific starting position class based on animation type
+            switch(state.animation) {
+                case 'left': els.img.classList.add('pos-left'); break;
+                case 'right': els.img.classList.add('pos-right'); break;
+                case 'top': els.img.classList.add('pos-top'); break;
+                case 'bottom': els.img.classList.add('pos-bottom'); break;
+                case 'zoom': 
+                case 'fade': 
+                    els.img.classList.add('pos-center'); 
+                    // Fade/Zoom just relies on opacity 0 and scale change defined in CSS
+                    break;
+            }
+            
+            // Apply Base Scale to the hidden state if it's not a transform animation
+            if (state.animation === 'fade') {
+                els.img.style.transform = `scale(${state.scale})`; 
+            }
+        }
+
+        // --- Animation Logic ---
+
+        function showImage() {
+            state.isVisible = true;
+            els.status.innerText = "State: ANIMATING IN";
+            
+            // 1. Ensure it's in the starting position (hidden)
+            applyHiddenState();
+            
+            // 2. Force Reflow (Browser needs to realize it was hidden before we show it)
+            void els.img.offsetWidth; 
+
+            // 3. Add Active Class (Triggers CSS Transition)
+            els.img.classList.add('active-state');
+            
+            // Override transform to include the user's scale setting
+            els.img.style.transform = `translate(0, 0) scale(${state.scale})`;
+
+            // 4. Wait for duration (Shown)
+            if(state.loopEnabled) {
+                // Determine total cycle time
+                const animTime = state.duration * 1000;
+                const stayTime = state.timeShow * 1000;
+                
+                // Wait for Animation to finish entering
+                setTimeout(() => {
+                    els.status.innerText = `State: VISIBLE (${state.timeShow}s)`;
+                }, animTime);
+
+                // Schedule Exit
+                clearTimeout(state.timeout);
+                state.timeout = setTimeout(hideImage, animTime + stayTime);
+            }
+        }
+
+        function hideImage() {
+            state.isVisible = false;
+            els.status.innerText = "State: ANIMATING OUT";
+            
+            // Remove active class -> reverts to hidden state defined by updateStyles()
+            applyHiddenState();
+
+            if(state.loopEnabled) {
+                const animTime = state.duration * 1000;
+                const waitTime = state.timeHide * 1000;
+
+                setTimeout(() => {
+                    els.status.innerText = `State: WAITING (${state.timeHide}s)`;
+                }, animTime);
+
+                // Schedule Next Show
+                clearTimeout(state.timeout);
+                state.timeout = setTimeout(showImage, animTime + waitTime);
+            } else {
+                setTimeout(() => {
+                    els.status.innerText = "State: IDLE";
+                }, state.duration * 1000);
+            }
+        }
+
+        // --- Triggers ---
+
+        function manualTrigger() {
+            // Reset any loops if manual trigger is clicked
+            clearTimeout(state.timeout);
+            
+            if (state.isVisible) {
+                hideImage();
+                // If loop is on, it will restart the wait cycle from here
+            } else {
+                showImage();
+            }
+        }
+
+        function toggleLoop() {
+            state.loopEnabled = els.loopEnabled.checked;
+            clearTimeout(state.timeout);
+            saveSettings();
+
+            if (state.loopEnabled) {
+                els.status.innerText = "State: LOOP STARTED";
+                showImage();
+            } else {
+                els.status.innerText = "State: LOOP STOPPED";
+                // Optionally hide immediately or finish current cycle? 
+                // Let's finish cycle but stop next trigger.
+            }
+        }
+
+        function resetState() {
+            clearTimeout(state.timeout);
+            state.loopEnabled = false;
+            els.loopEnabled.checked = false;
+            hideImage();
+            els.status.innerText = "State: STOPPED";
+            saveSettings();
+        }
+
+        // --- Data Persistence ---
+
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    // Compress/Store image data? 
+                    // LocalStorage has 5MB limit. Large images might crash it.
+                    // Warn user if image is huge.
+                    if(e.total > 4000000) {
+                        alert("Warning: Image is large. It might not save to browser storage properly.");
+                    }
+                    
+                    state.imageSrc = e.target.result;
+                    els.img.src = state.imageSrc;
+                    els.fileName.innerText = file.name;
+                    saveSettings();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function clearImage() {
+            state.imageSrc = '';
+            els.img.src = '';
+            els.fileName.innerText = "No image selected";
+            saveSettings();
+        }
+
+        function saveSettings() {
+            try {
+                localStorage.setItem('streamAnimator_config', JSON.stringify({
+                    animation: state.animation,
+                    duration: state.duration,
+                    scale: state.scale,
+                    loopEnabled: state.loopEnabled,
+                    timeShow: state.timeShow,
+                    timeHide: state.timeHide,
+                    // We save the image data URI too
+                    imageSrc: state.imageSrc
+                }));
+            } catch(e) {
+                console.error("Save failed", e);
+            }
+        }
+
+        function loadSettings() {
+            const data = localStorage.getItem('streamAnimator_config');
+            if(data) {
+                try {
+                    const cfg = JSON.parse(data);
+                    state.animation = cfg.animation || 'left';
+                    state.duration = cfg.duration || 1.0;
+                    state.scale = cfg.scale || 1.0;
+                    state.loopEnabled = cfg.loopEnabled || false;
+                    state.timeShow = cfg.timeShow || 5;
+                    state.timeHide = cfg.timeHide || 10;
+                    state.imageSrc = cfg.imageSrc || '';
+
+                    // Apply to UI
+                    els.animStyle.value = state.animation;
+                    els.animDuration.value = state.duration;
+                    els.imgScale.value = state.scale;
+                    els.loopEnabled.checked = state.loopEnabled;
+                    els.timeShow.value = state.timeShow;
+                    els.timeHide.value = state.timeHide;
+                    
+                    if(state.imageSrc) {
+                        els.img.src = state.imageSrc;
+                        els.fileName.innerText = "Image loaded from save";
+                    }
+                } catch(e) { console.error("Load failed", e); }
+            }
+        }
+
+        function toggleUI() {
+            document.body.classList.toggle('hide-ui');
+        }
+
+        // Boot
+        window.addEventListener('load', init);
+
+    </script>
+</body>
+</html>
