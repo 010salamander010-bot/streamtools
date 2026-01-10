@@ -1,0 +1,2134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salamander WebTuber v4.9.12 (OBS Patch)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #111; 
+            font-family: 'Segoe UI', sans-serif;
+        }
+        
+        /* --- STAGE (The Scene) --- */
+        #stage {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            overflow: hidden;
+            background-color: #00b140; 
+        }
+
+        /* Interactive Elements Wrappers */
+        .interactive-layer {
+            position: absolute;
+            transform-origin: center center;
+            cursor: grab;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto; 
+        }
+        .interactive-layer:active { cursor: grabbing; }
+        .interactive-layer.locked { cursor: default; pointer-events: none; }
+
+        /* FLIP Utility Class */
+        .flipped { transform: scaleX(-1); }
+
+        /* Z-INDEX STACKING ORDER */
+        
+        /* 1. Background (Bottom) */
+        #bg-wrapper {
+            top: 50%; left: 50%;
+            width: 100vw; height: 100vh;
+            z-index: 0;
+        }
+        #bg-img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
+
+        /* 2. Static Props (Back Layer) - Behind Avatar */
+        #props-static-back {
+            position: absolute;
+            inset: 0;
+            pointer-events: none; /* Let clicks pass to BG if empty */
+            z-index: 5;
+        }
+        /* Restore pointer events for children */
+        #props-static-back .interactive-layer { pointer-events: auto; }
+
+        /* 3. Avatar Group (Middle) */
+        #avatar-wrapper {
+            top: 50%; left: 50%;
+            width: 400px; height: 400px;
+            z-index: 10;
+            transform: translate(-50%, -50%) scale(1); 
+        }
+
+        /* The Physics Container (Inside wrapper) */
+        #avatar-physics {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            transform-origin: bottom center;
+            pointer-events: none; 
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+
+        #avatar-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            transition: filter 0.1s;
+        }
+
+        /* 4. Pinned Props (Attached to Avatar Physics) - On top of Avatar */
+        .prop-pinned {
+            z-index: 15;
+            width: 150px; height: 150px;
+        }
+        .prop-pinned img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+        /* 5. Static Props (Front Layer) - In front of Avatar & Pinned Props */
+        #props-static-front {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 30;
+        }
+        #props-static-front .interactive-layer { pointer-events: auto; }
+
+        /* Common Prop Styles */
+        .prop-static {
+            width: 300px; height: 300px;
+        }
+        .prop-static img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+
+        /* Swear Symbols */
+        .swear-symbol {
+            position: absolute;
+            font-weight: 900;
+            color: #ef4444; 
+            text-shadow: 2px 2px 0px #000;
+            font-family: 'Comic Sans MS', sans-serif;
+            opacity: 1;
+            pointer-events: none;
+            z-index: 20;
+        }
+        #swear-layer {
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        /* 6. Interaction Effects (Topmost) */
+        #interaction-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50; /* Ensure this is above props-static-front (30) */
+            overflow: visible; /* Allow throwing outside box */
+        }
+
+        /* Bonk Item */
+        #bonk-item {
+            position: absolute;
+            width: 250px; /* Increased size */
+            left: 50%;
+            top: -300px; /* Start off screen */
+            transform: translateX(-50%);
+            display: none;
+            z-index: 51; /* Ensure above stars and avatar */
+        }
+        
+        .anim-drop { animation: dropAnvil 0.4s ease-in forwards; }
+        @keyframes dropAnvil {
+            0% { top: -400px; }
+            100% { top: -50px; } /* Hit head area relative to 400px box */
+        }
+        .anim-fly-away { animation: flyAway 0.5s ease-out forwards; }
+        @keyframes flyAway {
+            0% { opacity: 1; transform: translateX(-50%) translateY(0) rotate(0deg); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-150px) rotate(45deg); }
+        }
+
+        /* Dizzy Stars */
+        #dizzy-stars {
+            position: absolute;
+            top: 20%; left: 50%;
+            width: 200px; height: 100px;
+            transform: translateX(-50%);
+            display: none;
+            z-index: 52;
+        }
+        .star {
+            position: absolute;
+            width: 30px;
+            left: 50%; top: 50%;
+            animation: spinStar 1s linear infinite;
+        }
+        @keyframes spinStar {
+            0% { transform: rotate(0deg) translateX(60px) rotate(0deg); }
+            100% { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
+        }
+
+        /* Throw Item */
+        #throw-item {
+            position: absolute;
+            width: 80px;
+            top: 50%;
+            left: -200px;
+            display: none;
+            z-index: 51;
+        }
+        .anim-throw { animation: throwObj 0.6s linear forwards; }
+        @keyframes throwObj {
+            0% { left: -200px; transform: translateY(0) rotate(0deg); }
+            50% { left: 50%; transform: translateY(-50px) rotate(180deg); }
+            100% { left: 150%; transform: translateY(100px) rotate(360deg); }
+        }
+
+        /* Pat Item */
+        #pat-hand {
+            position: absolute;
+            width: 120px;
+            left: 60%;
+            top: 10%;
+            transform: translate(-50%, 0);
+            display: none;
+            z-index: 51;
+        }
+        .anim-pat { animation: patHead 0.3s ease-in-out infinite alternate; }
+        @keyframes patHead {
+            0% { transform: translate(-50%, -10px) rotate(-5deg); }
+            100% { transform: translate(-50%, 10px) rotate(5deg); }
+        }
+
+        /* --- UI CONTROLS --- */
+        #controls {
+            position: absolute;
+            top: 10px; left: 10px;
+            background: rgba(17, 24, 39, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            width: 360px;
+            max-height: 90vh;
+            overflow-y: auto;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid #374151;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        #controls.hidden {
+            display: block !important;
+            transform: translateX(-400px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #controls::-webkit-scrollbar { width: 6px; }
+        #controls::-webkit-scrollbar-track { background: #1f2937; }
+        #controls::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+
+        .control-group { margin-bottom: 16px; border-bottom: 1px solid #374151; padding-bottom: 12px; }
+        .control-group:last-child { border-bottom: none; }
+        .control-group label { display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; color: #a5b4fc; letter-spacing: 0.05em; }
+        
+        input[type="range"] { width: 100%; accent-color: #a855f7; height: 4px; background: #4b5563; border-radius: 2px; }
+        
+        /* FORCE VISIBILITY */
+        input[type="text"] { 
+            background-color: #374151 !important; 
+            color: #ffffff !important; 
+            border: 1px solid #4b5563; 
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+        }
+        input[type="text"]:focus { border-color: #a855f7; }
+
+        select { 
+            width: 100%;
+            background-color: #ffffff !important; 
+            color: #000000 !important; 
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px;
+            font-size: 12px;
+            margin-bottom: 8px;
+            outline: none;
+        }
+        select:focus { border-color: #a855f7; }
+        select option { background-color: #ffffff; color: #000000; }
+        
+        .file-btn {
+            background: rgba(255,255,255,0.05); border: 1px dashed #6b7280;
+            padding: 8px; border-radius: 6px; text-align: center; cursor: pointer; font-size: 12px; color: #d1d5db; transition: all 0.2s;
+            flex: 1; /* For flex layouts */
+        }
+        .file-btn:hover { border-color: #a855f7; background: rgba(168, 85, 247, 0.1); color: white; }
+
+        .btn-clear {
+            background: rgba(153, 27, 27, 0.3); border: 1px dashed #7f1d1d;
+            color: #fca5a5; width: 32px; display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-clear:hover { background: rgba(185, 28, 28, 0.6); color: white; border-color: #ef4444; }
+
+        .btn-layer {
+            background: rgba(31, 41, 55, 0.8); border: 1px solid #4b5563;
+            color: #9ca3af; width: 40px; display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 10px; font-weight: bold;
+        }
+        .btn-layer:hover { border-color: #a855f7; color: white; }
+        .btn-layer.back { background: rgba(17, 24, 39, 0.8); border-color: #374151; color: #6b7280; }
+
+        /* Flip Button */
+        .btn-flip {
+            background: rgba(31, 41, 55, 0.8); border: 1px solid #4b5563;
+            color: #9ca3af; width: 32px; display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 12px;
+        }
+        .btn-flip:hover { border-color: #a855f7; color: white; }
+        .btn-flip.active { color: #a855f7; border-color: #a855f7; }
+
+        .btn-test {
+            background: #2563eb; color: white; width: 28px; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; cursor: pointer; border: none; font-size: 10px; transition: transform 0.1s;
+        }
+        .btn-test:active { transform: scale(0.9); }
+
+        .toggle-btn { @apply text-xs py-1 px-3 rounded border border-gray-600 bg-gray-800 text-gray-300 transition hover:bg-gray-700 cursor-pointer; }
+        .toggle-btn.active { @apply bg-purple-600 border-purple-500 text-white; }
+
+        .mode-btn { @apply flex-1 py-2 text-center text-xs font-bold rounded border border-gray-600 bg-gray-800 text-gray-400 transition cursor-pointer hover:bg-gray-700 relative overflow-hidden; }
+        .mode-btn.active { @apply bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/50; }
+        .key-badge { @apply absolute top-0 right-0 bg-gray-900 text-[9px] px-1 text-gray-400 rounded-bl opacity-70; }
+
+        #hint-overlay {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); color: #ccc; padding: 5px 15px; border-radius: 20px;
+            font-size: 12px; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 500;
+        }
+        .show-hint #hint-overlay { opacity: 1; }
+
+        details summary { cursor: pointer; list-style: none; font-size: 12px; color: #9ca3af; outline: none; }
+        details summary::-webkit-details-marker { display: none; }
+        details summary:hover { color: #fff; }
+        details[open] summary { margin-bottom: 10px; }
+        
+        .key-bind-input { 
+            width: 32px;
+            text-align: center;
+            text-transform: uppercase;
+            cursor: pointer;
+            background-color: #374151 !important; 
+            color: white !important; 
+            border: 1px solid #4b5563;
+            border-radius: 4px;
+            font-size: 12px;
+            padding: 2px 0;
+        }
+        .key-bind-input:focus { border-color: #a855f7; background-color: #4c1d95 !important; }
+
+        /* Prop List Style */
+        .prop-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #4b5563;
+            border-radius: 4px;
+            padding: 4px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        .prop-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70px; }
+
+        /* Resume Overlay */
+        #resume-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8); z-index: 9999;
+            display: none; justify-content: center; align-items: center;
+            flex-direction: column; color: white; text-align: center;
+        }
+    </style>
+</head>
+<body class="show-hint" onclick="resumeAudioContext()">
+
+    <!-- Resume Overlay for Autoplay policies -->
+    <div id="resume-overlay">
+        <div class="text-2xl font-bold mb-2">🖱 Click Anywhere</div>
+        <div class="text-sm text-gray-400">To resume Microphone & Audio</div>
+    </div>
+
+    <!-- The Stage -->
+    <div id="stage">
+        
+        <!-- 1. Background -->
+        <div id="bg-wrapper" class="interactive-layer">
+            <img id="bg-img" src="" style="display:none;">
+        </div>
+
+        <!-- 3. Static Props Container (Back) -->
+        <div id="props-static-back"></div>
+
+        <!-- 2. Avatar Group (Z-Index 10) -->
+        <div id="avatar-wrapper" class="interactive-layer">
+            
+            <!-- Physics Container (Bounces/Squashes) -->
+            <div id="avatar-physics">
+                <img id="avatar-img" src="https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png">
+                
+                <!-- Pinned Props Container -->
+                <div id="props-pinned-container" class="absolute inset-0 pointer-events-none"></div>
+
+                <div id="swear-layer" class="absolute inset-0 pointer-events-none"></div>
+            </div>
+
+            <!-- 4. Interaction Effects (Attached to Avatar Wrapper so they drag with it) -->
+            <div id="interaction-layer">
+                <img id="bonk-item" src="https://cdn3.emoji.gg/emojis/4365-anvil.png">
+                <img id="throw-item" src="https://cdn3.emoji.gg/emojis/6429-yeet.png">
+                <img id="pat-hand" src="https://cdn3.emoji.gg/emojis/1376-pat.png">
+                <div id="dizzy-stars"></div>
+            </div>
+
+        </div>
+
+        <!-- 3. Static Props Container (Front) -->
+        <div id="props-static-front"></div>
+
+    </div>
+
+    <!-- Hint -->
+    <div id="hint-overlay">Drag to Move • Wheel to Resize • 'H' to Hide UI</div>
+
+    <!-- Controls -->
+    <div id="controls">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-lg font-bold text-white">Web<span class="text-purple-400">Tuber</span> <span class="text-xs bg-purple-900 px-1 rounded">v4.9.12</span></h1>
+            <button id="btn-hide" class="text-gray-400 hover:text-white text-sm" title="Press 'H' to toggle">Hide UI ✕</button>
+        </div>
+
+        <!-- Profile Manager -->
+        <div class="control-group">
+            <label>Data Management</label>
+            <div class="text-[10px] text-gray-400 mb-2">
+                Settings auto-save to browser storage (Safety File).
+                <br><span class="text-yellow-500">Note:</span> Browser security prevents auto-loading from disk folders.
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportProfile()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded">⬇ Export Backup</button>
+                <div class="flex-1 relative">
+                    <button class="w-full bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded" onclick="document.getElementById('input-load').click()">⬆ Import Backup</button>
+                    <input type="file" id="input-load" class="hidden" accept=".json">
+                </div>
+            </div>
+            <button onclick="resetData()" class="w-full mt-2 bg-red-900/50 hover:bg-red-800 text-red-200 text-xs py-1 rounded border border-red-800">⚠ Wipe Data / Reset</button>
+        </div>
+
+        <!-- Audio Setup -->
+        <div class="control-group">
+            <label>Audio Setup</label>
+            <div class="text-[10px] text-yellow-500 mb-1" id="obs-hint" style="display:none;">⚠️ OBS: Do not Minimize to Taskbar (Window stops rendering). Just put in background.</div>
+            <select id="audio-device-select"><option value="">Default Microphone</option></select>
+            <button id="btn-start" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded-lg shadow-lg shadow-purple-900/30 transition flex items-center justify-center gap-2">
+                <span>🎤</span> Start Mic
+            </button>
+            <div class="flex items-center gap-2 mt-2">
+                <input type="checkbox" id="chk-bg-mode" class="accent-blue-500" checked>
+                <div class="text-[10px] text-gray-400 leading-tight">
+                    <strong class="text-white">Background "Keep-Alive"</strong><br>
+                    Prevents freezing in OBS when tab is hidden.
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Switcher -->
+        <div class="control-group">
+            <label>Expression Switcher</label>
+            <div class="flex gap-1 mb-2">
+                <div id="mode-1" class="mode-btn active" onclick="setMode(1)">Normal<div class="key-badge" id="badge-1">1</div></div>
+                <div id="mode-2" class="mode-btn" onclick="setMode(2)">Happy<div class="key-badge" id="badge-2">2</div></div>
+                <div id="mode-3" class="mode-btn" onclick="setMode(3)">Angry<div class="key-badge" id="badge-3">3</div></div>
+                <div id="mode-4" class="mode-btn" onclick="setMode(4)">Sad<div class="key-badge" id="badge-4">4</div></div>
+            </div>
+            <div class="text-[10px] text-gray-500 text-center italic" id="upload-hint">
+                Editing: <span id="current-mode-name" class="text-purple-400 font-bold">Normal</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Avatar Images (Current Mode)</label>
+            <div class="grid grid-cols-2 gap-2">
+                <!-- Idle -->
+                <div class="flex gap-1">
+                    <div class="file-btn" onclick="document.getElementById('input-idle').click()">
+                        <span id="label-idle">📂 Idle Frames</span>
+                    </div>
+                    <!-- Clear Button -->
+                    <button class="btn-clear" onclick="clearFrames('idle')" title="Clear Idle">🗑</button>
+                </div>
+                <!-- Talk -->
+                <div class="flex gap-1">
+                    <div class="file-btn" onclick="document.getElementById('input-talk').click()">
+                        <span id="label-talk">📂 Talk Frames</span>
+                    </div>
+                    <!-- Clear Button -->
+                    <button class="btn-clear" onclick="clearFrames('talk')" title="Clear Talk">🗑</button>
+                </div>
+            </div>
+            <input type="file" id="input-idle" class="hidden" multiple accept="image/*">
+            <input type="file" id="input-talk" class="hidden" multiple accept="image/*">
+        </div>
+
+        <!-- PROPS SYSTEM -->
+        <div class="control-group">
+            <label>Props & Layers</label>
+            
+            <!-- Pinned Props -->
+            <div class="mb-2">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] text-gray-400">Pinned (Bounces with you)</span>
+                    <button class="text-xs text-blue-400 hover:text-white" onclick="document.getElementById('input-prop-pinned').click()">+ Add</button>
+                </div>
+                <div id="list-pinned" class="space-y-1"></div>
+                <input type="file" id="input-prop-pinned" class="hidden" accept="image/*">
+            </div>
+
+            <!-- Static Props -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] text-gray-400">Static (Stays Put)</span>
+                    <button class="text-xs text-blue-400 hover:text-white" onclick="document.getElementById('input-prop-static').click()">+ Add</button>
+                </div>
+                <div id="list-static" class="space-y-1"></div>
+                <input type="file" id="input-prop-static" class="hidden" accept="image/*">
+            </div>
+        </div>
+
+        <!-- Input & Integration Settings -->
+        <div class="control-group">
+            <details>
+                <summary class="flex justify-between items-center bg-gray-800 p-2 rounded border border-gray-700">
+                    <span>🎮 Inputs & Integrations</span>
+                    <span class="text-[10px]">▼</span>
+                </summary>
+                <div class="pt-3 space-y-3 pl-1">
+                    
+                    <!-- Keyboard Rebinds -->
+                    <div>
+                        <div class="text-[10px] uppercase font-bold text-gray-500 mb-2">Keyboard Hotkeys (Focus Required)</div>
+                        <div class="grid grid-cols-4 gap-2 text-center">
+                            <div><div class="text-[9px] text-gray-400">Normal</div><input type="text" id="bind-1" class="key-bind-input" value="1" readonly></div>
+                            <div><div class="text-[9px] text-gray-400">Happy</div><input type="text" id="bind-2" class="key-bind-input" value="2" readonly></div>
+                            <div><div class="text-[9px] text-gray-400">Angry</div><input type="text" id="bind-3" class="key-bind-input" value="3" readonly></div>
+                            <div><div class="text-[9px] text-gray-400">Sad</div><input type="text" id="bind-4" class="key-bind-input" value="4" readonly></div>
+                        </div>
+                    </div>
+
+                    <!-- Twitch Integration -->
+                    <div class="border-t border-gray-700 pt-2">
+                        <div class="text-[10px] uppercase font-bold text-gray-500 mb-2">Twitch Remote (Auto-Connect)</div>
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" id="twitch-channel" placeholder="Channel Name" class="flex-1">
+                            <button id="btn-twitch-connect" class="bg-purple-700 hover:bg-purple-600 text-white text-xs px-3 rounded">Connect</button>
+                        </div>
+                        <div id="twitch-status" class="text-[10px] text-gray-500 mb-2 transition-colors duration-200">Not Connected</div>
+                        
+                        <div class="text-[9px] text-gray-400 mb-1">Set Chat Cmd AND/OR Reward ID/Name</div>
+                        
+                        <div class="space-y-2 mb-3">
+                            <div class="flex gap-1"><input type="text" id="cmd-1" placeholder="!normal"><input type="text" id="rwd-1" placeholder="Reward ID/Name"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-2" placeholder="!happy"><input type="text" id="rwd-2" placeholder="Reward ID/Name"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-3" placeholder="!angry"><input type="text" id="rwd-3" placeholder="Reward ID/Name"></div>
+                            <div class="flex gap-1"><input type="text" id="cmd-4" placeholder="!sad"><input type="text" id="rwd-4" placeholder="Reward ID/Name"></div>
+                        </div>
+
+                        <!-- Interaction Settings -->
+                        <div class="border-t border-gray-700 pt-2">
+                            <div class="text-[10px] uppercase font-bold text-gray-500 mb-2">Chat Interactions</div>
+                            
+                            <!-- Bonk -->
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-bonk" class="flex-1" placeholder="Cmd (!bonk)">
+                                <input type="text" id="rwd-bonk" class="flex-1" placeholder="Reward ID/Name">
+                            </div>
+                            <div class="mb-3 flex gap-1 justify-end">
+                                <div class="file-btn px-2" onclick="document.getElementById('input-bonk-img').click()" title="Img">🖼</div>
+                                <div class="file-btn px-2" onclick="document.getElementById('input-bonk-sfx').click()" title="Sfx">🔊</div>
+                                <button class="btn-test" onclick="triggerBonk()" title="Test">▶</button>
+                            </div>
+                            <input type="file" id="input-bonk-img" class="hidden" accept="image/*">
+                            <input type="file" id="input-bonk-sfx" class="hidden" accept="audio/*">
+                            
+                            <!-- Dizzy (Bonk Effect) -->
+                            <div class="mb-3 grid grid-cols-[1fr_auto_auto] gap-1">
+                                <div class="text-[10px] text-gray-400 flex items-center">💫 Dizzy Particle</div>
+                                <div class="file-btn px-2" onclick="document.getElementById('input-dizzy-img').click()" title="Img">🖼</div>
+                                <div class="file-btn px-2" onclick="document.getElementById('input-dizzy-sfx').click()" title="Sfx">🔊</div>
+                            </div>
+                            <input type="file" id="input-dizzy-img" class="hidden" accept="image/*">
+                            <input type="file" id="input-dizzy-sfx" class="hidden" accept="audio/*">
+
+                            <!-- Throw -->
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-throw" class="flex-1" placeholder="Cmd (!throw)">
+                                <input type="text" id="rwd-throw" class="flex-1" placeholder="Reward ID/Name">
+                            </div>
+                            <div class="mb-3 flex gap-1 justify-end">
+                                <div class="file-btn px-2" onclick="document.getElementById('input-throw-img').click()" title="Img">🖼</div>
+                                <button class="btn-test" onclick="triggerThrow()" title="Test">▶</button>
+                            </div>
+                            <input type="file" id="input-throw-img" class="hidden" accept="image/*">
+
+                            <!-- Pat -->
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-pat" class="flex-1" placeholder="Cmd (!pat)">
+                                <input type="text" id="rwd-pat" class="flex-1" placeholder="Reward ID/Name">
+                            </div>
+                            <div class="mb-3 flex gap-1 justify-end">
+                                <div class="file-btn px-2" onclick="document.getElementById('input-pat-img').click()" title="Img">🖼</div>
+                                <button class="btn-test" onclick="triggerPat()" title="Test">▶</button>
+                            </div>
+                            <input type="file" id="input-pat-img" class="hidden" accept="image/*">
+
+                            <!-- Cheer -->
+                            <div class="mb-1 flex gap-1">
+                                <input type="text" id="cmd-cheer" class="flex-1" placeholder="Cmd (!cheer)">
+                                <input type="text" id="rwd-cheer" class="flex-1" placeholder="Reward ID/Name">
+                            </div>
+                            <div class="flex gap-1 justify-end">
+                                <button class="btn-test" onclick="triggerCheer()" title="Test">▶</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </details>
+        </div>
+
+        <div class="control-group">
+            <label>Settings</label>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>Mic Volume / Talk Thresh</span>
+                        <span id="vol-meter" class="text-green-400 font-mono">0 / 80</span>
+                    </div>
+                    <input type="range" id="slider-threshold" min="1" max="100" value="15">
+                </div>
+                
+                <!-- NEW: Shout Threshold -->
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>Shout Threshold</span>
+                        <span id="val-shout" class="text-red-400">80</span>
+                    </div>
+                    <input type="range" id="slider-shout" min="1" max="100" value="80">
+                </div>
+
+                <!-- NEW: Cooldown & Volume -->
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>Cooldown</span>
+                        <span id="val-cooldown" class="text-blue-400">10s</span>
+                    </div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <input type="range" id="slider-cooldown" min="0" max="600" value="10" class="flex-1">
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] text-gray-400">
+                        <input type="checkbox" id="chk-global-cooldown" class="accent-blue-500">
+                        <span>Global Cooldown (Applies to everyone)</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>SFX Volume</span>
+                        <span id="val-sfx" class="text-blue-400">50%</span>
+                    </div>
+                    <input type="range" id="slider-sfx" min="0" max="100" value="50">
+                </div>
+
+                <details>
+                    <summary class="flex justify-between items-center bg-gray-800 p-2 rounded">
+                        <span>🛠 Animation Tuning</span>
+                        <span class="text-[10px]">▼</span>
+                    </summary>
+                    <div class="pt-3 space-y-3 pl-1">
+                        <div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Idle Speed (Blink)</span>
+                                <span id="speed-idle-val">150ms</span>
+                            </div>
+                            <input type="range" id="slider-speed-idle" min="50" max="1000" step="10" value="150" dir="rtl">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Talk Speed (Mouth)</span>
+                                <span id="speed-talk-val">60ms</span>
+                            </div>
+                            <input type="range" id="slider-speed-talk" min="20" max="300" step="10" value="60" dir="rtl">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400">Randomize Talk Frames</span>
+                            <input type="checkbox" id="chk-random-talk" class="accent-purple-500" checked>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Bounce Physics</span>
+                            </div>
+                            <input type="range" id="slider-bounce" min="0" max="100" value="20">
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Scene Editor</label>
+            <div class="flex gap-2 mb-2">
+                <button id="btn-lock" class="toggle-btn w-full flex justify-center items-center gap-2">
+                    <span>🔓</span> Unlocked
+                </button>
+                <button onclick="resetLayout()" class="toggle-btn w-auto" title="Reset Positions">↺</button>
+            </div>
+            
+            <div class="flex gap-2 mt-3">
+                <button id="btn-toggle-swear" class="toggle-btn flex-1">🤬 Swear</button>
+                <button id="btn-toggle-shake" class="toggle-btn flex-1 active">🫨 Shake</button>
+            </div>
+            <div class="mt-2">
+                <span class="text-[10px] text-gray-400 block mb-1">Zoom Intensity</span>
+                <input type="range" id="slider-zoom" min="100" max="150" value="110">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Background</label>
+            <div class="flex items-center gap-1">
+                <input type="color" id="bg-color-picker" value="#00b140" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0">
+                <div class="file-btn flex-1" onclick="document.getElementById('input-bg').click()">
+                    <span id="label-bg">🖼 Upload</span>
+                </div>
+                <button class="btn-flip" onclick="toggleBgFlip()" title="Flip">↔</button>
+                <button class="btn-clear" onclick="clearBg()" title="Clear Background">🗑</button>
+            </div>
+            <input type="file" id="input-bg" class="hidden" accept="image/*">
+        </div>
+    </div>
+
+    <script>
+        if (window.location.protocol === 'file:') alert("⚠️ Local File Detected. Mic access requires 'localhost' or GitHub Pages.");
+
+        // --- GLOBAL STATE ---
+        const state = {
+            audioContext: null,
+            analyser: null,
+            dataArray: null,
+            isAnimating: false,
+            
+            activeMode: 1, 
+            modes: {
+                1: { name: 'Normal', reward: 'Normal', idle: ["https://cdn3.emoji.gg/emojis/8422-blobcat-coffee.png"], talk: ["https://cdn3.emoji.gg/emojis/9686-blobcat-hyper.gif"] },
+                2: { name: 'Happy', reward: 'Happy', idle: [], talk: [] },
+                3: { name: 'Angry', reward: 'Angry', idle: [], talk: [] },
+                4: { name: 'Sad', reward: 'Sad', idle: [], talk: [] }
+            },
+            hotkeys: { 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', 4: 'Digit4' },
+            chatCmds: { 1: '!normal', 2: '!happy', 3: '!angry', 4: '!sad' },
+            
+            // Interaction State
+            bonk: { cmd: '!bonk', reward: 'Bonk', img: 'https://cdn3.emoji.gg/emojis/4365-anvil.png', sound: null },
+            throw: { cmd: '!throw', reward: 'Throw', img: 'https://cdn3.emoji.gg/emojis/6429-yeet.png' },
+            pat: { cmd: '!pat', reward: 'Pat', img: 'https://cdn3.emoji.gg/emojis/1376-pat.png' },
+            cheer: { cmd: '!cheer', reward: 'Cheer' },
+            dizzy: { img: 'https://cdn3.emoji.gg/emojis/5684-star.png', sound: null },
+            
+            isSquashed: false,
+            isJumping: false,
+            isDodging: false,
+            isPatting: false,
+            
+            // Sounds
+            dizzyAudio: null,
+            
+            isTalking: false,
+            isShouting: false,
+            currentFrameIndex: 0,
+            lastFrameTime: 0,
+            nextBlinkTime: 0,
+            isBlinking: false,
+            volume: 0,
+            enableSwear: false,
+            enableShake: true,
+            randomTalk: true,
+            isLocked: false,
+            
+            // NEW: Anti-Spam & Volume
+            userCooldowns: {}, // Map of username -> timestamp
+            globalCooldown: 0, // Global timestamp
+            settings: {
+                cooldown: 10, // seconds
+                globalCooldownMode: false,
+                sfxVolume: 0.5, // 0.0 to 1.0
+                shoutThreshold: 80
+            },
+
+            // Layout
+            layout: { 
+                avatar: { x: 0, y: 0, scale: 1 }, 
+                bg: { x: 0, y: 0, scale: 1, flip: false },
+                propsStatic: [], // Array of { id, src, x, y, scale, layer, flip }
+                propsPinned: []  // Array of { id, src, x, y, scale, flip }
+            }
+        };
+
+        const els = {
+            stage: document.getElementById('stage'),
+            avatarWrapper: document.getElementById('avatar-wrapper'),
+            avatarPhysics: document.getElementById('avatar-physics'),
+            avatarImg: document.getElementById('avatar-img'),
+            bgWrapper: document.getElementById('bg-wrapper'),
+            bgImg: document.getElementById('bg-img'),
+            propsStaticFront: document.getElementById('props-static-front'),
+            propsStaticBack: document.getElementById('props-static-back'),
+            propsPinnedContainer: document.getElementById('props-pinned-container'),
+            listPinned: document.getElementById('list-pinned'),
+            listStatic: document.getElementById('list-static'),
+            
+            bonkItem: document.getElementById('bonk-item'),
+            throwItem: document.getElementById('throw-item'),
+            patHand: document.getElementById('pat-hand'),
+            dizzyStars: document.getElementById('dizzy-stars'),
+            
+            swearLayer: document.getElementById('swear-layer'),
+            controls: document.getElementById('controls'),
+            volMeter: document.getElementById('vol-meter'),
+            
+            threshold: document.getElementById('slider-threshold'),
+            bounce: document.getElementById('slider-bounce'),
+            speedIdle: document.getElementById('slider-speed-idle'),
+            speedTalk: document.getElementById('slider-speed-talk'),
+            zoom: document.getElementById('slider-zoom'),
+            
+            // NEW UI
+            sliderCooldown: document.getElementById('slider-cooldown'),
+            valCooldown: document.getElementById('val-cooldown'),
+            chkGlobalCooldown: document.getElementById('chk-global-cooldown'),
+            
+            sliderSfx: document.getElementById('slider-sfx'),
+            valSfx: document.getElementById('val-sfx'),
+            sliderShout: document.getElementById('slider-shout'),
+            valShout: document.getElementById('val-shout'),
+            chkBgMode: document.getElementById('chk-bg-mode'),
+
+            bgColor: document.getElementById('bg-color-picker'),
+            randomTalk: document.getElementById('chk-random-talk'),
+            audioSelect: document.getElementById('audio-device-select'),
+            btnLock: document.getElementById('btn-lock'),
+            twitchChannel: document.getElementById('twitch-channel'),
+            twitchStatus: document.getElementById('twitch-status'),
+        };
+
+        // --- INIT STARS ---
+        function updateDizzyParticles() {
+            els.dizzyStars.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                const img = document.createElement('img');
+                img.src = state.dizzy.img;
+                img.className = 'star';
+                img.style.animationDelay = `${i * -0.2}s`;
+                els.dizzyStars.appendChild(img);
+            }
+        }
+        updateDizzyParticles();
+
+        // --- CORE FUNCTIONS FOR AUTO-SAVE ---
+        function getExportData() {
+            return {
+                modes: state.modes,
+                hotkeys: state.hotkeys,
+                chatCmds: state.chatCmds,
+                interactions: { bonk: state.bonk, throw: state.throw, pat: state.pat, cheer: state.cheer, dizzy: state.dizzy },
+                settings: {
+                    threshold: els.threshold.value,
+                    bounce: els.bounce.value,
+                    speedIdle: els.speedIdle.value,
+                    speedTalk: els.speedTalk.value,
+                    zoom: els.zoom.value,
+                    enableSwear: state.enableSwear,
+                    enableShake: state.enableShake,
+                    randomTalk: state.randomTalk,
+                    bgColor: els.bgColor.value,
+                    twitchChannel: els.twitchChannel.value,
+                    // NEW Settings
+                    cooldown: els.sliderCooldown.value,
+                    globalCooldownMode: els.chkGlobalCooldown.checked,
+                    sfxVolume: els.sliderSfx.value,
+                    shoutThreshold: els.sliderShout.value,
+                    audioDevice: els.audioSelect.value
+                },
+                layout: {
+                    avatar: { style: els.avatarWrapper.style.cssText, scale: els.avatarWrapper.getAttribute('data-scale') },
+                    bg: { style: els.bgWrapper.style.cssText, scale: els.bgWrapper.getAttribute('data-scale'), src: els.bgImg.src, flip: state.layout.bg.flip },
+                    propsStatic: state.layout.propsStatic,
+                    propsPinned: state.layout.propsPinned
+                }
+            };
+        }
+
+        function applyProfileData(data) {
+            if(data.modes) state.modes = data.modes;
+            if(data.hotkeys) state.hotkeys = data.hotkeys;
+            if(data.chatCmds) {
+                state.chatCmds = data.chatCmds;
+                [1,2,3,4].forEach(id => {
+                    document.getElementById(`cmd-${id}`).value = state.chatCmds[id] || '';
+                    document.getElementById(`rwd-${id}`).value = state.modes[id].reward || '';
+                });
+            }
+            if(data.interactions) {
+                state.bonk = data.interactions.bonk || state.bonk;
+                state.throw = data.interactions.throw || state.throw;
+                state.pat = data.interactions.pat || state.pat;
+                state.cheer = data.interactions.cheer || state.cheer;
+                state.dizzy = data.interactions.dizzy || state.dizzy;
+
+                // Restore inputs
+                document.getElementById('cmd-bonk').value = state.bonk.cmd || '';
+                document.getElementById('rwd-bonk').value = state.bonk.reward || '';
+                
+                document.getElementById('cmd-throw').value = state.throw.cmd || '';
+                document.getElementById('rwd-throw').value = state.throw.reward || '';
+                
+                document.getElementById('cmd-pat').value = state.pat.cmd || '';
+                document.getElementById('rwd-pat').value = state.pat.reward || '';
+                
+                document.getElementById('cmd-cheer').value = state.cheer.cmd || '';
+                document.getElementById('rwd-cheer').value = state.cheer.reward || '';
+                
+                els.bonkItem.src = state.bonk.img;
+                els.throwItem.src = state.throw.img;
+                els.patHand.src = state.pat.img;
+                
+                updateDizzyParticles();
+            }
+            if(data.settings) {
+                els.threshold.value = data.settings.threshold || 15;
+                els.bounce.value = data.settings.bounce || 20;
+                els.speedIdle.value = data.settings.speedIdle || 150;
+                els.speedTalk.value = data.settings.speedTalk || 60;
+                els.zoom.value = data.settings.zoom || 110;
+                els.bgColor.value = data.settings.bgColor || '#00b140';
+                els.stage.style.backgroundColor = els.bgColor.value;
+                els.twitchChannel.value = data.settings.twitchChannel || '';
+                
+                // NEW: Restore new settings
+                state.settings.cooldown = data.settings.cooldown || 10;
+                els.sliderCooldown.value = state.settings.cooldown;
+                els.valCooldown.innerText = state.settings.cooldown + "s";
+                
+                state.settings.globalCooldownMode = data.settings.globalCooldownMode || false;
+                els.chkGlobalCooldown.checked = state.settings.globalCooldownMode;
+
+                state.settings.sfxVolume = (data.settings.sfxVolume !== undefined) ? data.settings.sfxVolume : 50;
+                els.sliderSfx.value = state.settings.sfxVolume;
+                els.valSfx.innerText = state.settings.sfxVolume + "%";
+
+                state.settings.shoutThreshold = (data.settings.shoutThreshold !== undefined) ? data.settings.shoutThreshold : 80;
+                els.sliderShout.value = state.settings.shoutThreshold;
+                els.valShout.innerText = state.settings.shoutThreshold;
+
+                if (data.settings.audioDevice) els.audioSelect.value = data.settings.audioDevice;
+                
+                state.enableSwear = data.settings.enableSwear;
+                state.enableShake = data.settings.enableShake;
+                state.randomTalk = data.settings.randomTalk;
+                
+                document.getElementById('btn-toggle-swear').classList.toggle('active', state.enableSwear);
+                document.getElementById('btn-toggle-shake').classList.toggle('active', state.enableShake);
+                els.randomTalk.checked = state.randomTalk;
+            }
+            if(data.layout) {
+                const applyLayout = (el, cfg, imgEl) => {
+                    if(!cfg) return;
+                    el.style.cssText = cfg.style;
+                    el.setAttribute('data-scale', cfg.scale || 1);
+                    if(imgEl && cfg.src && cfg.src.length > 100) {
+                        imgEl.src = cfg.src;
+                        imgEl.style.display = 'block'; 
+                        if(el.style.display === 'none') el.style.display = 'flex';
+                    }
+                };
+                applyLayout(els.avatarWrapper, data.layout.avatar);
+                applyLayout(els.bgWrapper, data.layout.bg, els.bgImg);
+
+                // Restore BG Flip
+                state.layout.bg.flip = data.layout.bg.flip || false;
+                if(state.layout.bg.flip) els.bgImg.classList.add('flipped');
+                else els.bgImg.classList.remove('flipped');
+
+                // Restore Props
+                state.layout.propsStatic = data.layout.propsStatic || [];
+                state.layout.propsPinned = data.layout.propsPinned || [];
+                renderProps();
+            }
+            setMode(1);
+        }
+
+        function saveAuto() {
+            // Update State from UI
+            state.settings.cooldown = parseInt(els.sliderCooldown.value);
+            state.settings.globalCooldownMode = els.chkGlobalCooldown.checked;
+            state.settings.sfxVolume = parseInt(els.sliderSfx.value);
+            state.settings.shoutThreshold = parseInt(els.sliderShout.value);
+
+            // Sync Static Props DOM Styles
+            state.layout.propsStatic.forEach(prop => {
+                const el = document.getElementById(`prop-${prop.id}`);
+                if(el) {
+                    prop.style = el.style.cssText;
+                    prop.scale = el.getAttribute('data-scale');
+                }
+            });
+            // Sync Pinned Props DOM Styles
+            state.layout.propsPinned.forEach(prop => {
+                const el = document.getElementById(`prop-${prop.id}`);
+                if(el) {
+                    prop.style = el.style.cssText;
+                    prop.scale = el.getAttribute('data-scale');
+                }
+            });
+
+            try {
+                const data = getExportData();
+                localStorage.setItem('webTuber_profile', JSON.stringify(data));
+            } catch (e) {
+                console.warn("Auto-save quota exceeded or error", e);
+            }
+        }
+
+        function loadAuto() {
+            const json = localStorage.getItem('webTuber_profile');
+            if (json) {
+                try {
+                    const data = JSON.parse(json);
+                    applyProfileData(data);
+                } catch (e) {
+                    console.error("Auto-load failed", e);
+                }
+            }
+        }
+
+        window.resetData = () => {
+            if(confirm("⚠ This will WIPE all your saved images and settings. Are you sure?")) {
+                localStorage.removeItem('webTuber_profile');
+                location.reload();
+            }
+        };
+
+        // --- REMOVAL LOGIC ---
+        window.clearFrames = (type) => {
+            if(confirm(`Clear ${type} frames for this mode?`)) {
+                state.modes[state.activeMode][type] = [];
+                const label = document.getElementById(`label-${type}`);
+                label.innerText = `📂 ${type.charAt(0).toUpperCase() + type.slice(1)} Frames`;
+                label.parentElement.classList.remove('border-green-500', 'text-green-400');
+                if(type === 'idle') els.avatarImg.src = "";
+                saveAuto();
+            }
+        };
+
+        window.clearProp = (type) => {
+            if(confirm(`Remove ${type} prop?`)) {
+                const wrapper = document.getElementById(`prop-${type}-wrapper`);
+                const img = document.getElementById(`prop-${type}-img`);
+                const label = document.getElementById(`label-prop-${type}`);
+                img.src = "";
+                wrapper.style.display = 'none';
+                label.innerText = type === 'pinned' ? "🎩 Pinned" : "🎤 Static";
+                saveAuto();
+            }
+        };
+
+        window.clearBg = () => {
+            if(confirm("Remove background image?")) {
+                els.bgImg.src = "";
+                els.bgImg.style.display = 'none';
+                document.getElementById('label-bg').innerText = "🖼 Upload";
+                state.layout.bg.flip = false;
+                els.bgImg.classList.remove('flipped');
+                saveAuto();
+            }
+        };
+
+        // --- BG FLIP ---
+        window.toggleBgFlip = () => {
+            state.layout.bg.flip = !state.layout.bg.flip;
+            if(state.layout.bg.flip) els.bgImg.classList.add('flipped');
+            else els.bgImg.classList.remove('flipped');
+            saveAuto();
+        }
+
+        // --- PROPS LOGIC ---
+        function addProp(type, src) {
+            const id = Date.now().toString();
+            const prop = {
+                id: id,
+                src: src,
+                style: type === 'pinned' ? 'top: 20%; left: 50%; width: 150px; height: 150px;' : 'top: 80%; left: 50%; width: 600px; height: 300px;',
+                scale: 1,
+                layer: 'front', // only for static
+                flip: false
+            };
+
+            if (type === 'static') {
+                state.layout.propsStatic.push(prop);
+            } else {
+                state.layout.propsPinned.push(prop);
+            }
+            renderProps();
+            saveAuto();
+        }
+
+        function removeProp(type, id) {
+            if(confirm("Remove this prop?")) {
+                if (type === 'static') {
+                    state.layout.propsStatic = state.layout.propsStatic.filter(p => p.id !== id);
+                } else {
+                    state.layout.propsPinned = state.layout.propsPinned.filter(p => p.id !== id);
+                }
+                renderProps();
+                saveAuto();
+            }
+        }
+
+        function togglePropLayer(id) {
+            const prop = state.layout.propsStatic.find(p => p.id === id);
+            if (prop) {
+                prop.layer = prop.layer === 'front' ? 'back' : 'front';
+                renderProps();
+                saveAuto();
+            }
+        }
+
+        function togglePropFlip(type, id) {
+            const list = type === 'static' ? state.layout.propsStatic : state.layout.propsPinned;
+            const prop = list.find(p => p.id === id);
+            if (prop) {
+                prop.flip = !prop.flip;
+                // Update DOM directly for speed
+                const img = document.querySelector(`#prop-${id} img`);
+                if(img) {
+                     if(prop.flip) img.classList.add('flipped');
+                     else img.classList.remove('flipped');
+                }
+                saveAuto();
+            }
+        }
+
+        function renderProps() {
+            // Clear containers
+            els.propsStaticFront.innerHTML = '';
+            els.propsStaticBack.innerHTML = '';
+            els.propsPinnedContainer.innerHTML = '';
+            els.listPinned.innerHTML = '';
+            els.listStatic.innerHTML = '';
+
+            // Render Static Props
+            state.layout.propsStatic.forEach(prop => {
+                // DOM Element
+                const el = document.createElement('div');
+                el.id = `prop-${prop.id}`;
+                el.className = 'interactive-layer prop-static';
+                el.style.cssText = prop.style;
+                el.setAttribute('data-scale', prop.scale);
+                
+                const img = document.createElement('img');
+                img.src = prop.src;
+                if(prop.flip) img.classList.add('flipped');
+                el.appendChild(img);
+
+                makeInteractive(el);
+
+                if (prop.layer === 'back') {
+                    els.propsStaticBack.appendChild(el);
+                } else {
+                    els.propsStaticFront.appendChild(el);
+                }
+
+                // UI List Item
+                const li = document.createElement('div');
+                li.className = 'prop-item';
+                li.innerHTML = `
+                    <span>Prop ${prop.id.slice(-4)}</span>
+                    <div class="flex gap-1">
+                        <button class="btn-flip" onclick="togglePropFlip('static', '${prop.id}')" title="Flip">↔</button>
+                        <button class="btn-layer ${prop.layer === 'back' ? 'back' : ''}" onclick="togglePropLayer('${prop.id}')">${prop.layer === 'back' ? 'Back' : 'Front'}</button>
+                        <button class="btn-clear" onclick="removeProp('static', '${prop.id}')">🗑</button>
+                    </div>
+                `;
+                els.listStatic.appendChild(li);
+            });
+
+            // Render Pinned Props
+            state.layout.propsPinned.forEach(prop => {
+                // DOM Element
+                const el = document.createElement('div');
+                el.id = `prop-${prop.id}`;
+                el.className = 'interactive-layer prop-pinned';
+                el.style.cssText = prop.style;
+                el.setAttribute('data-scale', prop.scale);
+
+                const img = document.createElement('img');
+                img.src = prop.src;
+                if(prop.flip) img.classList.add('flipped');
+                el.appendChild(img);
+
+                makeInteractive(el);
+                els.propsPinnedContainer.appendChild(el);
+
+                // UI List Item
+                const li = document.createElement('div');
+                li.className = 'prop-item';
+                li.innerHTML = `
+                    <span>Prop ${prop.id.slice(-4)}</span>
+                    <div class="flex gap-1">
+                         <button class="btn-flip" onclick="togglePropFlip('pinned', '${prop.id}')" title="Flip">↔</button>
+                         <button class="btn-clear" onclick="removeProp('pinned', '${prop.id}')">🗑</button>
+                    </div>
+                `;
+                els.listPinned.appendChild(li);
+            });
+        }
+
+
+        // --- INPUT CONFIGURATION ---
+        function setupKeyBinders() {
+            [1,2,3,4].forEach(id => {
+                const input = document.getElementById(`bind-${id}`);
+                input.addEventListener('keydown', (e) => {
+                    e.preventDefault();
+                    state.hotkeys[id] = e.code; 
+                    input.value = e.code.replace('Digit','').replace('Key',''); 
+                    document.getElementById(`badge-${id}`).innerText = input.value.substring(0,3); 
+                    input.blur();
+                    saveAuto(); 
+                });
+            });
+        }
+        setupKeyBinders();
+
+        // Update handlers for both CMD and RWD
+        function updateInputs() {
+            [1,2,3,4].forEach(id => {
+                const cmdVal = document.getElementById(`cmd-${id}`).value.trim().toLowerCase();
+                const rwdVal = document.getElementById(`rwd-${id}`).value.trim();
+                
+                state.chatCmds[id] = cmdVal;
+                state.modes[id].reward = rwdVal;
+            });
+            saveAuto();
+        }
+        [1,2,3,4].forEach(id => {
+            document.getElementById(`cmd-${id}`).addEventListener('input', updateInputs);
+            document.getElementById(`rwd-${id}`).addEventListener('input', updateInputs);
+        });
+
+        // --- INTERACTIONS SETUP ---
+        // Helper to setup listeners for both inputs
+        const setupInteractionListeners = (key) => {
+            document.getElementById(`cmd-${key}`).addEventListener('input', (e) => {
+                state[key].cmd = e.target.value.trim().toLowerCase();
+                saveAuto();
+            });
+            document.getElementById(`rwd-${key}`).addEventListener('input', (e) => {
+                state[key].reward = e.target.value.trim();
+                saveAuto();
+            });
+        };
+        
+        setupInteractionListeners('bonk');
+        setupInteractionListeners('throw');
+        setupInteractionListeners('pat');
+        setupInteractionListeners('cheer');
+
+        document.getElementById('input-bonk-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.bonk.img = ev.target.result;
+                    els.bonkItem.src = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+        document.getElementById('input-bonk-sfx').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.bonk.sound = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('input-dizzy-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.dizzy.img = ev.target.result;
+                    updateDizzyParticles();
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+        
+        // NEW: Dizzy Sound
+        document.getElementById('input-dizzy-sfx').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.dizzy.sound = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('input-throw-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.throw.img = ev.target.result;
+                    els.throwItem.src = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('input-pat-img').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    state.pat.img = ev.target.result;
+                    els.patHand.src = ev.target.result;
+                    saveAuto();
+                };
+                r.readAsDataURL(file);
+            }
+        });
+
+        // --- ANIMATION TRIGGERS ---
+        window.triggerBonk = () => {
+            if(state.isSquashed) return; 
+            if(state.bonk.sound) {
+                const audio = new Audio(state.bonk.sound);
+                audio.volume = state.settings.sfxVolume / 100;
+                audio.play();
+            }
+            els.bonkItem.style.display = 'block';
+            els.bonkItem.classList.add('anim-drop');
+            setTimeout(() => {
+                state.isSquashed = true; 
+                els.dizzyStars.style.display = 'block';
+                
+                // Play Dizzy Sound Loop
+                if (state.dizzy.sound) {
+                    state.dizzyAudio = new Audio(state.dizzy.sound);
+                    state.dizzyAudio.loop = true;
+                    state.dizzyAudio.volume = state.settings.sfxVolume / 100;
+                    state.dizzyAudio.play();
+                }
+
+                els.bonkItem.classList.remove('anim-drop');
+                els.bonkItem.classList.add('anim-fly-away');
+                setTimeout(() => {
+                    state.isSquashed = false;
+                    
+                    // Stop Dizzy Sound
+                    if(state.dizzyAudio) {
+                        state.dizzyAudio.pause();
+                        state.dizzyAudio = null;
+                    }
+                    
+                    els.dizzyStars.style.display = 'none';
+                    els.bonkItem.style.display = 'none';
+                    els.bonkItem.classList.remove('anim-fly-away');
+                }, 3000);
+            }, 400); 
+        };
+
+        window.triggerThrow = () => {
+            els.throwItem.style.display = 'block';
+            els.throwItem.classList.add('anim-throw');
+            
+            // Start Dodge
+            setTimeout(() => {
+                 state.isDodging = true;
+                 setTimeout(() => { state.isDodging = false; }, 300);
+            }, 250);
+            
+            setTimeout(() => {
+                els.throwItem.style.display = 'none';
+                els.throwItem.classList.remove('anim-throw');
+            }, 600);
+        };
+
+        window.triggerPat = () => {
+            els.patHand.style.display = 'block';
+            els.patHand.classList.add('anim-pat');
+            state.isPatting = true;
+            setTimeout(() => {
+                els.patHand.style.display = 'none';
+                els.patHand.classList.remove('anim-pat');
+                state.isPatting = false;
+            }, 3000);
+        };
+
+        window.triggerCheer = () => {
+            const end = Date.now() + 2000;
+            state.isJumping = true;
+            
+            // Brighter colors and larger particles for visibility
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffffff'];
+
+            (function frame() {
+                confetti({ 
+                    particleCount: 3, 
+                    angle: 60, 
+                    spread: 55, 
+                    origin: { x: 0, y: 0.7 },
+                    colors: colors,
+                    scalar: 2, // Make particles 2x bigger
+                    startVelocity: 45
+                });
+                confetti({ 
+                    particleCount: 3, 
+                    angle: 120, 
+                    spread: 55, 
+                    origin: { x: 1, y: 0.7 },
+                    colors: colors,
+                    scalar: 2, // Make particles 2x bigger
+                    startVelocity: 45
+                });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+            setTimeout(() => { state.isJumping = false; }, 2000);
+        };
+
+        // --- MODE SWITCHING ---
+        window.setMode = (modeId) => {
+            state.activeMode = modeId;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`mode-${modeId}`).classList.add('active');
+            const modeName = state.modes[modeId].name;
+            document.getElementById('current-mode-name').innerText = modeName;
+            const idleCount = state.modes[modeId].idle.length;
+            const talkCount = state.modes[modeId].talk.length;
+            document.getElementById('label-idle').innerText = idleCount > 0 ? `✅ ${idleCount} Frames` : `📂 Idle Frames`;
+            document.getElementById('label-talk').innerText = talkCount > 0 ? `✅ ${talkCount} Frames` : `📂 Talk Frames`;
+            state.currentFrameIndex = 0;
+            state.isBlinking = false;
+            const activeFrames = state.modes[modeId].idle;
+            if(activeFrames.length > 0) els.avatarImg.src = activeFrames[0];
+            else els.avatarImg.src = ""; 
+        };
+
+        // --- TWITCH INTEGRATION ---
+        function connectTwitch(channelName) {
+            let channel = channelName.trim().toLowerCase();
+            
+            // --- NEW: Sanitize Input ---
+            // Remove common copy-paste artifacts
+            channel = channel.replace("https://", "").replace("http://", "");
+            channel = channel.replace("twitch.tv/", "");
+            channel = channel.replace("@", "");
+            channel = channel.split('/')[0]; // Handle trailing slashes or subpaths
+            
+            // Update the input box to show the sanitized name
+            els.twitchChannel.value = channel;
+
+            if(!channel) return;
+            
+            try { ComfyJS.Disconnect(); } catch(e){}
+            
+            // Common function to handle reward triggering
+            const handleRewardTrigger = (rewardName, rewardId) => {
+                // Normalize inputs
+                const rName = rewardName ? rewardName.toLowerCase() : "";
+                const rId = rewardId || "";
+
+                // Helper to check against settings
+                const match = (setting) => {
+                    if (!setting) return false;
+                    const s = setting.toLowerCase();
+                    // Match ID exact or Name partial
+                    return s === rId || (rName && rName.includes(s));
+                }
+
+                // Check Interactions
+                if (match(state.bonk.reward)) triggerBonk();
+                else if (match(state.throw.reward)) triggerThrow();
+                else if (match(state.pat.reward)) triggerPat();
+                else if (match(state.cheer.reward)) triggerCheer();
+                
+                // Check Modes
+                else {
+                    for (const [modeId, modeData] of Object.entries(state.modes)) {
+                        if (match(modeData.reward)) {
+                            setMode(parseInt(modeId));
+                            document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
+                            setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
+                        }
+                    }
+                }
+            };
+
+            // --- NEW: CHAT LISTENER FOR DEBUGGING & ID TRIGGERING ---
+            ComfyJS.onChat = (user, message, flags, self, extra) => {
+                console.log(`💬 Chat: [${user}] ${message}`);
+                
+                if (extra.customRewardId) {
+                    console.log("👉 Message has Reward ID:", extra.customRewardId);
+                    // Trigger logic moved here to support IDs on anonymous connections
+                    handleRewardTrigger(null, extra.customRewardId);
+                }
+            };
+
+            // --- CHANNEL POINT HANDLER ---
+            ComfyJS.onReward = (user, reward, cost, message, extra, other) => {
+                console.log("🎁 Reward redeemed:", user, reward, cost); 
+                // Flash Status
+                els.twitchStatus.style.color = '#fff';
+                setTimeout(() => els.twitchStatus.style.color = '#4ade80', 200);
+                
+                // Use the common handler
+                // extra.customRewardId is usually available here too
+                handleRewardTrigger(reward, extra.customRewardId);
+            };
+
+            ComfyJS.onCommand = (user, command, message, flags, extra) => {
+                console.log(`⚡ Cmd: !${command}`); // Debug log
+                const now = Date.now();
+                const cdMs = (state.settings.cooldown || 0) * 1000;
+                
+                // Determine last usage time based on mode (Global vs User)
+                const lastUsage = state.settings.globalCooldownMode ? state.globalCooldown : (state.userCooldowns[user] || 0);
+
+                const fullCmd = "!" + command.toLowerCase();
+
+                // !cooldown command (Mod/Broadcaster Only)
+                if (fullCmd === '!cooldown' && (flags.broadcaster || flags.mod)) {
+                    const secs = parseInt(message);
+                    if (!isNaN(secs) && secs >= 0) {
+                        const newCooldown = Math.min(secs, 600); 
+                        state.settings.cooldown = newCooldown;
+                        els.sliderCooldown.value = newCooldown;
+                        els.valCooldown.innerText = newCooldown + "s";
+                        saveAuto();
+                        return; // Stop processing
+                    }
+                }
+
+                // Check Cooldown (Exempt Broadcasters)
+                if(!flags.broadcaster && (now - lastUsage < cdMs)) {
+                    console.log(`Ignored command from ${user} (Cooldown active)`);
+                    return;
+                }
+
+                let triggered = false;
+
+                if(state.bonk.cmd && fullCmd === state.bonk.cmd) { triggerBonk(); triggered = true; }
+                else if(state.throw.cmd && fullCmd === state.throw.cmd) { triggerThrow(); triggered = true; }
+                else if(state.pat.cmd && fullCmd === state.pat.cmd) { triggerPat(); triggered = true; }
+                else if(state.cheer.cmd && fullCmd === state.cheer.cmd) { triggerCheer(); triggered = true; }
+                else {
+                    for (const [modeId, trigger] of Object.entries(state.chatCmds)) {
+                        if (trigger && trigger === fullCmd) {
+                            setMode(parseInt(modeId));
+                            document.getElementById(`mode-${modeId}`).classList.add('ring-2', 'ring-white');
+                            setTimeout(() => document.getElementById(`mode-${modeId}`).classList.remove('ring-2', 'ring-white'), 200);
+                            triggered = true;
+                        }
+                    }
+                }
+
+                // Only update cooldown if a valid command was actually triggered
+                if (triggered) {
+                    state.userCooldowns[user] = now;
+                    state.globalCooldown = now;
+                    
+                    // Also Flash status for commands
+                    els.twitchStatus.style.color = '#fff';
+                    setTimeout(() => els.twitchStatus.style.color = '#4ade80', 200);
+                }
+            };
+
+            ComfyJS.onConnected = () => {
+                els.twitchStatus.innerText = "✅ Connected to " + channel;
+                els.twitchStatus.classList.add('text-green-400');
+                saveAuto();
+            };
+            ComfyJS.Init(channel);
+        }
+
+        document.getElementById('btn-twitch-connect').addEventListener('click', () => {
+            if(!els.twitchChannel.value) return alert("Enter a channel name!");
+            connectTwitch(els.twitchChannel.value);
+        });
+
+        const toggleUI = () => {
+            els.controls.classList.toggle('hidden');
+            document.body.classList.toggle('show-hint');
+            // Show hint about minimizing
+            document.getElementById('obs-hint').style.display = 'block';
+        };
+        document.getElementById('btn-hide').addEventListener('click', toggleUI);
+        
+        window.addEventListener('keydown', (e) => {
+            // Ignore if typing in input field
+            if (e.target.tagName === 'INPUT') return;
+
+            // 'H' key toggle
+            if (e.key.toLowerCase() === 'h') {
+                e.preventDefault(); 
+                toggleUI();
+                return;
+            }
+
+            // Mode hotkeys
+            for (const [modeId, keyCode] of Object.entries(state.hotkeys)) {
+                if (e.code === keyCode) {
+                    setMode(parseInt(modeId));
+                }
+            }
+        });
+
+        // --- EXPORT / IMPORT ---
+        window.exportProfile = () => {
+            const exportData = getExportData();
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
+            const node = document.createElement('a');
+            node.setAttribute("href", dataStr);
+            node.setAttribute("download", "webtuber_profile.json");
+            document.body.appendChild(node);
+            node.click();
+            node.remove();
+        };
+
+        document.getElementById('input-load').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    applyProfileData(data);
+                    saveAuto();
+                    alert("✅ Profile Loaded!");
+                } catch(err) { alert("Error loading profile"); }
+            };
+            r.readAsText(file);
+        });
+
+        // --- INTERACTION ---
+        let dragTarget = null;
+        let startX, startY, initialLeft, initialTop;
+
+        function makeInteractive(el) {
+            el.addEventListener('mousedown', (e) => {
+                if (state.isLocked) return;
+                if (e.button !== 0) return;
+                e.stopPropagation(); 
+                e.preventDefault();
+                dragTarget = el;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = el.offsetLeft;
+                initialTop = el.offsetTop;
+            });
+
+            el.addEventListener('wheel', (e) => {
+                if (state.isLocked) return;
+                e.preventDefault();
+                let currentScale = parseFloat(el.getAttribute('data-scale')) || 1;
+                const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                let newScale = Math.max(0.1, currentScale + delta);
+                el.setAttribute('data-scale', newScale);
+                updateTransform(el);
+                saveAuto();
+            });
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            if (!dragTarget || state.isLocked) return;
+            e.preventDefault();
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            dragTarget.style.left = `${initialLeft + dx}px`;
+            dragTarget.style.top = `${initialTop + dy}px`;
+            dragTarget.setAttribute('data-dragged', 'true');
+            updateTransform(dragTarget);
+        });
+
+        window.addEventListener('mouseup', () => { 
+            if(dragTarget) {
+                dragTarget = null;
+                saveAuto(); 
+            }
+        });
+
+        function updateTransform(el) {
+            const scale = parseFloat(el.getAttribute('data-scale')) || 1;
+            const isDragged = el.getAttribute('data-dragged') === 'true';
+            el.style.transform = isDragged ? `scale(${scale})` : `translate(-50%, -50%) scale(${scale})`;
+        }
+
+        makeInteractive(els.avatarWrapper);
+        makeInteractive(els.bgWrapper);
+
+        els.btnLock.addEventListener('click', () => {
+            state.isLocked = !state.isLocked;
+            if (state.isLocked) {
+                els.btnLock.innerHTML = "<span>🔒</span> Locked";
+                els.btnLock.classList.add('bg-red-900', 'border-red-700', 'text-red-200');
+                document.querySelectorAll('.interactive-layer').forEach(el => el.classList.add('locked'));
+            } else {
+                els.btnLock.innerHTML = "<span>🔓</span> Unlocked";
+                els.btnLock.className = "toggle-btn w-full flex justify-center items-center gap-2";
+                document.querySelectorAll('.interactive-layer').forEach(el => el.classList.remove('locked'));
+            }
+        });
+
+        window.resetLayout = () => {
+            if(confirm("Reset positions?")) {
+                ['avatarWrapper', 'bgWrapper', 'propStaticWrapper', 'propPinnedWrapper'].forEach(key => {
+                    const el = els[key];
+                    if (el) { // Safety check
+                        el.style.left = '50%';
+                        el.style.top = '50%';
+                        el.setAttribute('data-scale', 1);
+                        el.setAttribute('data-dragged', 'false');
+                        el.style.transform = `translate(-50%, -50%) scale(1)`;
+                    }
+                });
+                
+                // Also reset array prop positions
+                state.layout.propsStatic.forEach(p => {
+                    const el = document.getElementById(`prop-${p.id}`);
+                    if(el) {
+                        el.style.left = '50%';
+                        el.style.top = '80%';
+                        el.setAttribute('data-scale', 1);
+                        updateTransform(el);
+                    }
+                });
+                state.layout.propsPinned.forEach(p => {
+                    const el = document.getElementById(`prop-${p.id}`);
+                    if(el) {
+                        el.style.left = '50%';
+                        el.style.top = '20%';
+                        el.setAttribute('data-scale', 1);
+                        updateTransform(el);
+                    }
+                });
+                
+                saveAuto();
+            }
+        };
+
+        // --- AUDIO ENGINE ---
+        async function getAudioDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                els.audioSelect.innerHTML = '<option value="">Default Microphone</option>';
+                audioInputs.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Microphone ${els.audioSelect.length + 1}`;
+                    els.audioSelect.appendChild(option);
+                });
+                const savedDevice = localStorage.getItem('webTuber_audioDevice');
+                if (savedDevice) els.audioSelect.value = savedDevice;
+            } catch(e) { console.error("Device Enum Error", e); }
+        }
+        getAudioDevices();
+
+        els.audioSelect.addEventListener('change', () => {
+            localStorage.setItem('webTuber_audioDevice', els.audioSelect.value);
+            saveAuto();
+        });
+
+        // --- BACKGROUND KEEP ALIVE ---
+        // Creates a silent audio loop to prevent browser throttling in background tabs
+        function enableBackgroundMode() {
+            if (!state.audioContext) return;
+            try {
+                const osc = state.audioContext.createOscillator();
+                const gain = state.audioContext.createGain();
+                gain.gain.value = 0.0001; // Virtually silent, but active
+                osc.connect(gain);
+                gain.connect(state.audioContext.destination);
+                osc.start();
+                console.log("Background Keep-Alive Active");
+            } catch(e) { console.warn("BG Mode Error", e); }
+        }
+
+        async function startMicrophone() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (state.audioContext) state.audioContext.close();
+                state.audioContext = new AudioContext();
+                
+                const constraints = { audio: true };
+                if(els.audioSelect.value) constraints.audio = { deviceId: { exact: els.audioSelect.value } };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const microphone = state.audioContext.createMediaStreamSource(stream);
+                state.analyser = state.audioContext.createAnalyser();
+                state.analyser.fftSize = 512;
+                microphone.connect(state.analyser);
+                state.dataArray = new Uint8Array(state.analyser.frequencyBinCount);
+                
+                document.getElementById('btn-start').innerHTML = "<span>✅</span> Mic Active";
+                document.getElementById('btn-start').classList.replace('bg-purple-600', 'bg-green-700');
+                localStorage.setItem('webTuber_micPermission', 'true');
+                
+                if (els.chkBgMode.checked) enableBackgroundMode();
+
+                await getAudioDevices();
+                
+                if (!state.isAnimating) {
+                    state.isAnimating = true;
+                    initSwearParticles();
+                    animate();
+                }
+
+                // Check for Autoplay policy
+                if (state.audioContext.state === 'suspended') {
+                    document.getElementById('resume-overlay').style.display = 'flex';
+                }
+
+            } catch (err) { 
+                if (err.name === 'NotAllowedError') {
+                    alert("Microphone denied. Please check browser permissions.");
+                    localStorage.removeItem('webTuber_micPermission');
+                } else {
+                    console.error("Mic Error:", err);
+                }
+            }
+        }
+
+        // Global Resume Function
+        window.resumeAudioContext = () => {
+            if (state.audioContext && state.audioContext.state === 'suspended') {
+                state.audioContext.resume().then(() => {
+                    document.getElementById('resume-overlay').style.display = 'none';
+                });
+            } else {
+                document.getElementById('resume-overlay').style.display = 'none';
+            }
+        };
+
+        document.getElementById('btn-start').addEventListener('click', startMicrophone);
+        
+        // --- AUTO START & LOAD ---
+        window.addEventListener('load', async () => {
+            loadAuto(); // Auto-load settings
+            
+            // Auto Connect Twitch
+            if (els.twitchChannel.value) {
+                console.log("Auto-connecting to Twitch...");
+                connectTwitch(els.twitchChannel.value);
+            }
+
+            // Auto Start Mic
+            if (localStorage.getItem('webTuber_micPermission') === 'true') {
+                console.log("Auto-starting Mic...");
+                startMicrophone();
+            }
+        });
+
+        // NEW: Listeners for new sliders
+        els.sliderCooldown.addEventListener('input', (e) => els.valCooldown.innerText = e.target.value + "s");
+        els.sliderSfx.addEventListener('input', (e) => els.valSfx.innerText = e.target.value + "%");
+        els.sliderShout.addEventListener('input', (e) => els.valShout.innerText = e.target.value);
+        
+        els.sliderCooldown.addEventListener('change', saveAuto);
+        els.chkGlobalCooldown.addEventListener('change', saveAuto);
+        els.sliderSfx.addEventListener('change', saveAuto);
+        els.sliderShout.addEventListener('change', saveAuto);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (state.analyser) {
+                state.analyser.getByteFrequencyData(state.dataArray);
+                let sum = 0;
+                for(let i = 0; i < state.dataArray.length; i++) sum += state.dataArray[i];
+                const average = sum / state.dataArray.length;
+                state.volume = state.volume * 0.8 + average * 0.2;
+                
+                // Update text to show current vs shout threshold
+                els.volMeter.innerText = `${Math.floor(state.volume)} / ${state.settings.shoutThreshold}`;
+            }
+
+            const threshold = parseInt(els.threshold.value);
+            const wasTalking = state.isTalking;
+            state.isTalking = state.volume > threshold;
+            
+            // Shout Logic updated to use separate threshold
+            state.isShouting = state.volume > state.settings.shoutThreshold;
+
+            if (wasTalking !== state.isTalking) {
+                state.currentFrameIndex = 0;
+                state.lastFrameTime = 0;
+                state.isBlinking = false;
+            }
+
+            const now = Date.now();
+            const activeModeObj = state.modes[state.activeMode];
+            
+            if (state.isTalking) {
+                const speed = parseInt(els.speedTalk.value);
+                if (now - state.lastFrameTime > speed) {
+                    if (state.randomTalk && activeModeObj.talk.length > 1) {
+                        let nextFrame;
+                        do {
+                            nextFrame = Math.floor(Math.random() * activeModeObj.talk.length);
+                        } while (nextFrame === state.currentFrameIndex && activeModeObj.talk.length > 1);
+                        state.currentFrameIndex = nextFrame;
+                    } else {
+                        state.currentFrameIndex = (state.currentFrameIndex + 1) % activeModeObj.talk.length;
+                    }
+                    if(activeModeObj.talk.length > 0) els.avatarImg.src = activeModeObj.talk[state.currentFrameIndex];
+                    state.lastFrameTime = now;
+                }
+            } else {
+                const speed = parseInt(els.speedIdle.value);
+                if (!state.isBlinking && now > state.nextBlinkTime) {
+                    state.isBlinking = true;
+                    state.currentFrameIndex = 0; 
+                }
+                if (state.isBlinking && activeModeObj.idle.length > 1) {
+                    if (now - state.lastFrameTime > speed) {
+                        state.currentFrameIndex++;
+                        if (state.currentFrameIndex >= activeModeObj.idle.length) {
+                            state.currentFrameIndex = 0;
+                            state.isBlinking = false;
+                            state.nextBlinkTime = now + (Math.random() * 3000 + 2000);
+                        }
+                        els.avatarImg.src = activeModeObj.idle[state.currentFrameIndex];
+                        state.lastFrameTime = now;
+                    }
+                } else if(activeModeObj.idle.length > 0 && els.avatarImg.src !== activeModeObj.idle[0]) {
+                    els.avatarImg.src = activeModeObj.idle[0];
+                }
+            }
+
+            let scaleX = 1, scaleY = 1, translateY = 0, rotate = 0;
+            const bounceFactor = parseInt(els.bounce.value) / 3000;
+            if (state.volume > 5) {
+                const intensity = Math.max(0, state.volume - threshold); 
+                const deformation = intensity * bounceFactor; 
+                scaleY = 1 - (deformation * 0.2); 
+                scaleX = 1 + (deformation * 0.1); 
+                translateY = deformation * 10;
+            }
+
+            let zoomScale = 1;
+            if (state.isShouting) {
+                zoomScale = parseInt(els.zoom.value) / 100;
+                if (state.enableShake) {
+                    rotate = (Math.random() - 0.5) * 5;
+                    translateY += (Math.random() - 0.5) * 10;
+                }
+                if (state.enableSwear) {
+                    els.swearLayer.style.opacity = 1;
+                    Array.from(els.swearLayer.children).forEach(c => {
+                        c.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px) rotate(${Math.random()*20-10}deg)`;
+                    });
+                } else els.swearLayer.style.opacity = 0;
+            } else els.swearLayer.style.opacity = 0;
+
+            // Interactions override physics
+            if (state.isSquashed) {
+                scaleY = 0.4;
+                scaleX = 1.3;
+                translateY = 100; 
+            }
+            if (state.isJumping) {
+                translateY -= 50; 
+            }
+            
+            // NEW: Dodge
+            let translateX = 0;
+            if (state.isDodging) {
+                translateX = 40; // Dodge right
+                rotate -= 15; // Lean left
+            }
+            // NEW: Pat
+            if (state.isPatting) {
+                // Gentle squash oscilation
+                const patTime = Date.now() / 100;
+                const squish = Math.sin(patTime * 20) * 0.05; // +/- 0.05
+                scaleY = 1 - 0.1 + squish; // Base squash 0.9 + wobble
+                scaleX = 1 + 0.1 - squish; // Base widen 1.1 - wobble
+                translateY += 10;
+            }
+
+            els.stage.style.transform = `scale(${state.isShouting ? zoomScale : 1})`;
+            els.avatarPhysics.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
+            els.avatarImg.style.filter = (state.isShouting && state.volume > 90) ? "brightness(1.2)" : "brightness(1.0)";
+        }
+
+        // --- FILE HANDLING ---
+        function handleUpload(inputId, labelId, type) {
+            document.getElementById(inputId).addEventListener('change', function(e) {
+                const files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+                    const loadedFrames = [];
+                    let count = 0;
+                    files.forEach((file, i) => {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            loadedFrames[i] = ev.target.result;
+                            count++;
+                            if (count === files.length) {
+                                state.modes[state.activeMode][type] = loadedFrames;
+                                state.currentFrameIndex = 0;
+                                document.getElementById(labelId).innerText = `✅ ${files.length} Frames`;
+                                document.getElementById(labelId).parentElement.classList.add('border-green-500', 'text-green-400');
+                                if(type === 'idle') els.avatarImg.src = loadedFrames[0];
+                                saveAuto();
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+            });
+        }
+
+        handleUpload('input-idle', 'label-idle', 'idle');
+        handleUpload('input-talk', 'label-talk', 'talk');
+
+        // Props Upload Handlers
+        const handlePropUpload = (inputId, labelId, wrapperId, imgId, stateKey) => {
+            document.getElementById(inputId).addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        addProp(stateKey === 'propStatic' ? 'static' : 'pinned', ev.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        };
+        // Reuse generic props uploader for multiple items logic
+        // We modify input listeners to call addProp instead of single set
+        document.getElementById('input-prop-static').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => addProp('static', ev.target.result);
+                r.readAsDataURL(file);
+            }
+        });
+        document.getElementById('input-prop-pinned').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const r = new FileReader();
+                r.onload = (ev) => addProp('pinned', ev.target.result);
+                r.readAsDataURL(file);
+            }
+        });
+
+
+        document.getElementById('input-bg').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    els.bgImg.src = ev.target.result;
+                    els.bgImg.style.display = 'block';
+                    document.getElementById('label-bg').innerText = "✅ Loaded";
+                    saveAuto(); 
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('bg-color-picker').addEventListener('input', (e) => {
+            els.stage.style.backgroundColor = e.target.value;
+            saveAuto();
+        });
+
+        function initSwearParticles() {
+            const symbols = ['@', '#', '!', '%', '&', '$', '🤬', '💢'];
+            for(let i=0; i<10; i++) {
+                const el = document.createElement('div');
+                el.className = 'swear-symbol';
+                el.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                el.style.left = (20 + Math.random() * 60) + '%';
+                el.style.top = (10 + Math.random() * 40) + '%';
+                el.style.fontSize = (20 + Math.random() * 30) + 'px';
+                el.style.transform = `rotate(${Math.random() * 60 - 30}deg)`;
+                els.swearLayer.appendChild(el);
+            }
+        }
+
+        ['btn-toggle-swear', 'btn-toggle-shake'].forEach(id => {
+            document.getElementById(id).addEventListener('click', function() {
+                this.classList.toggle('active');
+                if(id.includes('swear')) state.enableSwear = !state.enableSwear;
+                if(id.includes('shake')) state.enableShake = !state.enableShake;
+                saveAuto(); 
+            });
+        });
+
+        els.randomTalk.addEventListener('change', (e) => {
+            state.randomTalk = e.target.checked;
+            saveAuto();
+        });
+        
+        [els.threshold, els.bounce, els.speedIdle, els.speedTalk, els.zoom].forEach(el => {
+            el.addEventListener('change', saveAuto);
+        });
+        
+        els.speedIdle.addEventListener('input', (e) => document.getElementById('speed-idle-val').innerText = e.target.value + 'ms');
+        els.speedTalk.addEventListener('input', (e) => document.getElementById('speed-talk-val').innerText = e.target.value + 'ms');
+
+    </script>
+</body>
+</html>
