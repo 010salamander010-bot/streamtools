@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hogwarts House Points</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Twitch Chat Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Cinzel', serif;
+            background-color: #0f0f13;
+            background-image: radial-gradient(circle at 50% 50%, #1a1a24 0%, #0a0a0c 100%);
+            color: #e2e8f0;
+            overflow: hidden; /* Prevent scroll bars from falling gems */
+        }
+
+        /* Glass Shine Effect */
+        .glass-shine {
+            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0) 100%);
+            pointer-events: none;
+        }
+
+        /* Text Shadows for readability */
+        .text-glow {
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        /* House Specific Colors for Text/Glow */
+        .gryffindor-color { color: #ff4d4d; }
+        .slytherin-color { color: #2ecc71; }
+        .ravenclaw-color { color: #3498db; }
+        .hufflepuff-color { color: #f1c40f; }
+        
+        /* Custom Input Styling */
+        .magic-input {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #4a5568;
+            color: #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        .magic-input:focus {
+            border-color: #f6ad55;
+            box-shadow: 0 0 10px rgba(246, 173, 85, 0.3);
+            outline: none;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col items-center justify-between py-6">
+
+    <!-- Header / Controls -->
+    <div class="z-50 w-full max-w-4xl px-4 flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+        <h1 class="text-3xl font-bold tracking-widest text-amber-500 text-center md:text-left">HOUSE POINTS</h1>
+        
+        <div class="flex gap-2">
+            <input type="text" id="channelInput" placeholder="Twitch Channel Name" class="magic-input px-4 py-2 rounded font-sans text-sm w-48">
+            <button onclick="connectToTwitch()" id="connectBtn" class="bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded transition-colors text-sm font-sans">
+                CONNECT
+            </button>
+        </div>
+        
+        <div id="status" class="text-xs text-gray-500 font-sans italic">Status: Disconnected</div>
+    </div>
+
+    <!-- Main Hourglass Display -->
+    <div class="flex-grow w-full max-w-6xl grid grid-cols-4 gap-4 px-4 items-end justify-items-center relative">
+        
+        <!-- Canvas for particle effects sits on top -->
+        <canvas id="particleCanvas"></canvas>
+
+        <!-- Gryffindor -->
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="gryffindor">
+            <div class="text-4xl font-bold mb-2 gryffindor-color score-display">0</div>
+            <div class="relative w-full max-w-[120px] h-[60vh]">
+                <!-- SVG Hourglass Frame -->
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl filter" style="filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.2));">
+                    <defs>
+                        <clipPath id="clip-gryffindor">
+                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
+                        </clipPath>
+                    </defs>
+                    
+                    <!-- Background Glass -->
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="#4a1a1a" stroke-width="2"/>
+
+                    <!-- The Sand/Gems (Fill) -->
+                    <rect x="0" y="0" width="100" height="300" fill="#740001" 
+                          class="transition-all duration-1000 ease-out fill-rect"
+                          style="clip-path: url(#clip-gryffindor); transform-origin: bottom; transform: scaleY(0);" />
+                    
+                    <!-- Shine overlay -->
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                </svg>
+            </div>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400">GRYFFINDOR</h2>
+        </div>
+
+        <!-- Slytherin -->
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="slytherin">
+            <div class="text-4xl font-bold mb-2 slytherin-color score-display">0</div>
+            <div class="relative w-full max-w-[120px] h-[60vh]">
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 10px rgba(0, 255, 0, 0.2));">
+                    <defs>
+                        <clipPath id="clip-slytherin">
+                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
+                        </clipPath>
+                    </defs>
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="#1a472a" stroke-width="2"/>
+                    <rect x="0" y="0" width="100" height="300" fill="#1a472a" 
+                          class="transition-all duration-1000 ease-out fill-rect"
+                          style="clip-path: url(#clip-slytherin); transform-origin: bottom; transform: scaleY(0);" />
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                </svg>
+            </div>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400">SLYTHERIN</h2>
+        </div>
+
+        <!-- Ravenclaw -->
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="ravenclaw">
+            <div class="text-4xl font-bold mb-2 ravenclaw-color score-display">0</div>
+            <div class="relative w-full max-w-[120px] h-[60vh]">
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 10px rgba(0, 0, 255, 0.2));">
+                    <defs>
+                        <clipPath id="clip-ravenclaw">
+                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
+                        </clipPath>
+                    </defs>
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="#0e1a40" stroke-width="2"/>
+                    <rect x="0" y="0" width="100" height="300" fill="#222f5b" 
+                          class="transition-all duration-1000 ease-out fill-rect"
+                          style="clip-path: url(#clip-ravenclaw); transform-origin: bottom; transform: scaleY(0);" />
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                </svg>
+            </div>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400">RAVENCLAW</h2>
+        </div>
+
+        <!-- Hufflepuff -->
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="hufflepuff">
+            <div class="text-4xl font-bold mb-2 hufflepuff-color score-display">0</div>
+            <div class="relative w-full max-w-[120px] h-[60vh]">
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 10px rgba(255, 255, 0, 0.2));">
+                    <defs>
+                        <clipPath id="clip-hufflepuff">
+                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
+                        </clipPath>
+                    </defs>
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="#ecb939" stroke-width="2"/>
+                    <rect x="0" y="0" width="100" height="300" fill="#ecb939" 
+                          class="transition-all duration-1000 ease-out fill-rect"
+                          style="clip-path: url(#clip-hufflepuff); transform-origin: bottom; transform: scaleY(0);" />
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                </svg>
+            </div>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400">HUFFLEPUFF</h2>
+        </div>
+    </div>
+
+    <!-- Global SVG Defs -->
+    <svg width="0" height="0">
+        <defs>
+            <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
+                <stop offset="50%" style="stop-color:rgb(255,255,255);stop-opacity:0.2" />
+                <stop offset="100%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <!-- Recent Events Log (Optional, visible just to confirm logic) -->
+    <div id="log" class="text-[10px] text-gray-700 font-sans fixed bottom-2 right-2 opacity-50">Waiting for events...</div>
+
+    <script>
+        // --- CONFIG & STATE ---
+        const HOUSE_CONFIG = {
+            gryffindor: { color: '#740001', maxPoints: 500, current: 0 },
+            slytherin:  { color: '#1a472a', maxPoints: 500, current: 0 },
+            ravenclaw:  { color: '#222f5b', maxPoints: 500, current: 0 },
+            hufflepuff: { color: '#ecb939', maxPoints: 500, current: 0 }
+        };
+
+        let client = null;
+
+        // --- TWITCH CONNECTION ---
+        function connectToTwitch() {
+            const channel = document.getElementById('channelInput').value.trim();
+            const statusEl = document.getElementById('status');
+            const btn = document.getElementById('connectBtn');
+
+            if (!channel) {
+                alert("Please enter a channel name!");
+                return;
+            }
+
+            // Reset client if exists
+            if (client) {
+                client.disconnect();
+            }
+
+            statusEl.textContent = `Connecting to ${channel}...`;
+            statusEl.className = "text-xs text-yellow-500 font-sans italic";
+
+            client = new tmi.Client({
+                channels: [channel]
+            });
+
+            client.connect().then(() => {
+                statusEl.textContent = `Connected to ${channel}`;
+                statusEl.className = "text-xs text-green-500 font-sans italic";
+                btn.textContent = "CONNECTED";
+                btn.classList.replace('bg-amber-700', 'bg-green-800');
+                btn.classList.replace('hover:bg-amber-600', 'hover:bg-green-700');
+                document.getElementById('log').textContent = "Listening for points...";
+            }).catch(err => {
+                statusEl.textContent = `Error: ${err}`;
+                statusEl.className = "text-xs text-red-500 font-sans italic";
+            });
+
+            client.on('message', (channel, tags, message, self) => {
+                parseMessage(message, tags['display-name']);
+            });
+        }
+
+        // --- MESSAGE PARSING ---
+        function parseMessage(msg, username) {
+            // Regex to find: [number] points [to/for] [house]
+            // Supports: "10 points to Gryffindor", "50 points for Slytherin", "-10 points to Ravenclaw"
+            const regex = /(-?\d+)\s+pont?\s+(?:a|az)?\s*(Griffendélnek|Mardekárnak|Hollóhátnak|Hugrabugnak)/i;
+            const match = msg.match(regex);
+
+            if (match) {
+                const points = parseInt(match[1]);
+                const house = match[2].toLowerCase();
+                
+                if (!isNaN(points) && HOUSE_CONFIG[house]) {
+                    updatePoints(house, points);
+                    logEvent(`${username}: ${points} to ${house}`);
+                    
+                    if (points > 0) {
+                        triggerParticles(house, points);
+                    }
+                }
+            }
+        }
+
+        function updatePoints(house, points) {
+            const config = HOUSE_CONFIG[house];
+            config.current += points;
+            
+            // Prevent negative total points (optional rule)
+            if (config.current < 0) config.current = 0;
+
+            // DOM Updates
+            const container = document.querySelector(`.house-container[data-house="${house}"]`);
+            const scoreEl = container.querySelector('.score-display');
+            const fillRect = container.querySelector('.fill-rect');
+
+            // Update Number
+            scoreEl.textContent = config.current;
+
+            // Update Visual Fill (Cap at 100% for visual purposes, but keep counting real score)
+            // We scale based on maxPoints (e.g., 500 points = full glass)
+            let percentage = (config.current / config.maxPoints);
+            if (percentage > 1) percentage = 1; 
+            if (percentage < 0) percentage = 0;
+            
+            fillRect.style.transform = `scaleY(${percentage})`;
+        }
+
+        function logEvent(text) {
+            const log = document.getElementById('log');
+            log.textContent = text;
+            log.style.opacity = 1;
+            setTimeout(() => log.style.opacity = 0.5, 2000);
+        }
+
+        // --- PARTICLE SYSTEM (THE GEMS) ---
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor(house) {
+                // Find the house container position
+                const container = document.querySelector(`.house-container[data-house="${house}"]`);
+                const rect = container.getBoundingClientRect();
+                
+                // Spawn at the top of the glass bulb
+                this.x = rect.left + rect.width / 2 + (Math.random() * 40 - 20); 
+                this.y = rect.top; // Start at top of container
+                
+                // Physics
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = Math.random() * 2 + 2; // Initial downward velocity
+                this.gravity = 0.2;
+                
+                // Appearance
+                this.size = Math.random() * 3 + 2;
+                this.color = HOUSE_CONFIG[house].color;
+                this.life = 100; // Frames to live
+                
+                // Floor (approximate middle of glass for simplicity or fill level)
+                // Let's make them fall to the bottom of the screen
+                this.floor = rect.bottom - 20; 
+            }
+
+            update() {
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce
+                if (this.y > this.floor) {
+                    this.y = this.floor;
+                    this.vy *= -0.5; // Lose energy
+                    this.vx *= 0.8;  // Friction
+                }
+                
+                this.life--;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                // Diamond shape for "gem" look
+                ctx.moveTo(this.x, this.y - this.size);
+                ctx.lineTo(this.x + this.size, this.y);
+                ctx.lineTo(this.x, this.y + this.size);
+                ctx.lineTo(this.x - this.size, this.y);
+                ctx.fill();
+            }
+        }
+
+        function triggerParticles(house, amount) {
+            // Cap particles to avoid lag if someone gives 1000 points
+            let count = Math.min(amount, 20); 
+            if (count < 5) count = 5; // Minimum burst
+
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    particles.push(new Particle(house));
+                }, i * 50); // Stagger them
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+
+            // Remove dead particles
+            particles = particles.filter(p => p.life > 0);
+            
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+    </script>
+</body>
+</html>
