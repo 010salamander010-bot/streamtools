@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 0.3</title>
+    <title>Hogwarts House Points 0.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Twitch Chat Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js"></script>
@@ -229,21 +229,22 @@
 
         // --- TWITCH CONNECTION ---
         async function connectToTwitch() {
-            let channel = document.getElementById('channelInput').value.trim();
+            let channelInput = document.getElementById('channelInput').value.trim();
             const statusEl = document.getElementById('status');
             const btn = document.getElementById('connectBtn');
 
-            if (!channel) {
+            if (!channelInput) {
                 alert("Please enter a channel name!");
                 return;
             }
             
-            // Clean URL if pasted directly (e.g. https://twitch.tv/ninja -> ninja)
-            channel = channel.replace('https://', '')
+            // Robust cleaning: remove URL parts, slashes, and # prefix if user added it
+            let channel = channelInput.replace('https://', '')
                              .replace('http://', '')
                              .replace('www.', '')
                              .replace('twitch.tv/', '')
-                             .replace('/', '')
+                             .replace(/\//g, '') // Remove all slashes
+                             .replace(/#/g, '')  // Remove all hashes
                              .toLowerCase();
 
             // Ensure we disconnect cleanly before reconnecting
@@ -261,27 +262,27 @@
             statusEl.className = "text-xs text-yellow-500 font-sans italic";
             btn.disabled = true;
 
-            // Configure TMI with secure connection settings
+            // Configure TMI
             client = new tmi.Client({
-                options: { debug: true }, // Debug true helps see issues in console
+                options: { debug: true },
                 connection: {
                     secure: true,
                     reconnect: true
                 },
-                // Explicitly add # to ensure TMI parses it as a channel immediately
                 channels: [`#${channel}`]
             });
 
-            // Connection Timeout Safety
+            // Set up a safety timeout
             const connectionTimeout = setTimeout(() => {
                 if(statusEl.textContent.includes('Connecting')) {
-                    statusEl.textContent = "Error: Connection timed out. Try refreshing the page.";
-                    statusEl.className = "text-xs text-red-500 font-sans italic";
-                    btn.disabled = false;
+                    statusEl.textContent = "Taking longer than usual... (Check firewall/adblock)";
+                    statusEl.className = "text-xs text-orange-500 font-sans italic";
+                    btn.disabled = false; // Allow them to try again
                 }
-            }, 10000);
+            }, 8000);
 
-            client.connect().then(() => {
+            // Listen for the 'connected' event specifically (more reliable than promise)
+            client.on('connected', (address, port) => {
                 clearTimeout(connectionTimeout);
                 statusEl.textContent = `Connected to ${channel}`;
                 statusEl.className = "text-xs text-green-500 font-sans italic";
@@ -290,7 +291,17 @@
                 btn.classList.replace('hover:bg-amber-600', 'hover:bg-green-700');
                 btn.disabled = false;
                 document.getElementById('log').textContent = "Listening for points...";
-            }).catch(err => {
+            });
+
+            client.on('disconnected', (reason) => {
+                 statusEl.textContent = `Disconnected: ${reason}`;
+                 statusEl.className = "text-xs text-gray-500 font-sans italic";
+                 btn.textContent = "CONNECT";
+                 btn.classList.replace('bg-green-800', 'bg-amber-700');
+            });
+
+            // Connect
+            client.connect().catch(err => {
                 clearTimeout(connectionTimeout);
                 console.error(err);
                 statusEl.textContent = `Error: ${err}`;
