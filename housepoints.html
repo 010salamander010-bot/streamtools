@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points</title>
+    <title>Hogwarts House Points 0.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Twitch Chat Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js"></script>
@@ -15,12 +15,12 @@
             background-color: #0f0f13;
             background-image: radial-gradient(circle at 50% 50%, #1a1a24 0%, #0a0a0c 100%);
             color: #e2e8f0;
-            overflow: hidden; /* Prevent scroll bars from falling gems */
+            overflow: hidden;
         }
 
         /* Glass Shine Effect */
         .glass-shine {
-            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0) 100%);
+            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.15) 40%, rgba(255,255,255,0) 100%);
             pointer-events: none;
         }
 
@@ -55,17 +55,28 @@
             pointer-events: none;
             z-index: 10;
         }
+
+        /* Test Button Styling (Visible on Hover) */
+        .house-container:hover .test-btn {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .test-btn {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+        }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col items-center justify-between py-6">
 
     <!-- Header / Controls -->
     <div class="z-50 w-full max-w-4xl px-4 flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
-        <h1 class="text-3xl font-bold tracking-widest text-amber-500 text-center md:text-left">HOUSE POINTS</h1>
+        <h1 class="text-3xl font-bold tracking-widest text-amber-500 text-center md:text-left drop-shadow-lg">HOUSE POINTS</h1>
         
-        <div class="flex gap-2">
+        <div class="flex gap-2 relative">
             <input type="text" id="channelInput" placeholder="Twitch Channel Name" class="magic-input px-4 py-2 rounded font-sans text-sm w-48">
-            <button onclick="connectToTwitch()" id="connectBtn" class="bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded transition-colors text-sm font-sans">
+            <button onclick="connectToTwitch()" id="connectBtn" class="bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded transition-colors text-sm font-sans border border-amber-800">
                 CONNECT
             </button>
         </div>
@@ -80,11 +91,12 @@
         <canvas id="particleCanvas"></canvas>
 
         <!-- Gryffindor / Griffendél -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="gryffindor">
-            <div class="text-4xl font-bold mb-2 gryffindor-color score-display">0</div>
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="gryffindor">
+            <button onclick="manualAdd('gryffindor')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 gryffindor-color score-display drop-shadow-md">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
                 <!-- SVG Hourglass Frame -->
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl filter" style="filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.2));">
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl filter" style="filter: drop-shadow(0 0 15px rgba(255, 0, 0, 0.3));">
                     <defs>
                         <clipPath id="clip-gryffindor">
                             <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
@@ -93,7 +105,7 @@
                     
                     <!-- Background Glass -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#4a1a1a" stroke-width="2"/>
+                          fill="rgba(255,255,255,0.08)" stroke="#4a1a1a" stroke-width="2"/>
 
                     <!-- The Sand/Gems (Fill) -->
                     <rect x="0" y="0" width="100" height="300" fill="#740001" 
@@ -102,76 +114,79 @@
                     
                     <!-- Shine overlay -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Griffendél</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Griffendél</h2>
         </div>
 
         <!-- Slytherin / Mardekár -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="slytherin">
-            <div class="text-4xl font-bold mb-2 slytherin-color score-display">0</div>
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="slytherin">
+            <button onclick="manualAdd('slytherin')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 slytherin-color score-display drop-shadow-md">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 10px rgba(0, 255, 0, 0.2));">
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(0, 255, 0, 0.3));">
                     <defs>
                         <clipPath id="clip-slytherin">
                             <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
                         </clipPath>
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#1a472a" stroke-width="2"/>
+                          fill="rgba(255,255,255,0.08)" stroke="#1a472a" stroke-width="2"/>
                     <rect x="0" y="0" width="100" height="300" fill="#1a472a" 
                           class="transition-all duration-1000 ease-out fill-rect"
                           style="clip-path: url(#clip-slytherin); transform-origin: bottom; transform: scaleY(0);" />
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Mardekár</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Mardekár</h2>
         </div>
 
         <!-- Ravenclaw / Hollóhát -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="ravenclaw">
-            <div class="text-4xl font-bold mb-2 ravenclaw-color score-display">0</div>
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="ravenclaw">
+            <button onclick="manualAdd('ravenclaw')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 ravenclaw-color score-display drop-shadow-md">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 10px rgba(0, 0, 255, 0.2));">
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(0, 0, 255, 0.3));">
                     <defs>
                         <clipPath id="clip-ravenclaw">
                             <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
                         </clipPath>
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#0e1a40" stroke-width="2"/>
+                          fill="rgba(255,255,255,0.08)" stroke="#0e1a40" stroke-width="2"/>
                     <rect x="0" y="0" width="100" height="300" fill="#222f5b" 
                           class="transition-all duration-1000 ease-out fill-rect"
                           style="clip-path: url(#clip-ravenclaw); transform-origin: bottom; transform: scaleY(0);" />
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Hollóhát</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Hollóhát</h2>
         </div>
 
         <!-- Hufflepuff / Hugrabug -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="hufflepuff">
-            <div class="text-4xl font-bold mb-2 hufflepuff-color score-display">0</div>
+        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="hufflepuff">
+            <button onclick="manualAdd('hufflepuff')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 hufflepuff-color score-display drop-shadow-md">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 10px rgba(255, 255, 0, 0.2));">
+                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.3));">
                     <defs>
                         <clipPath id="clip-hufflepuff">
                             <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
                         </clipPath>
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#ecb939" stroke-width="2"/>
+                          fill="rgba(255,255,255,0.08)" stroke="#ecb939" stroke-width="2"/>
                     <rect x="0" y="0" width="100" height="300" fill="#ecb939" 
                           class="transition-all duration-1000 ease-out fill-rect"
                           style="clip-path: url(#clip-hufflepuff); transform-origin: bottom; transform: scaleY(0);" />
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
+                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Hugrabug</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Hugrabug</h2>
         </div>
     </div>
 
@@ -180,7 +195,7 @@
         <defs>
             <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
-                <stop offset="50%" style="stop-color:rgb(255,255,255);stop-opacity:0.2" />
+                <stop offset="50%" style="stop-color:rgb(255,255,255);stop-opacity:0.25" />
                 <stop offset="100%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
             </linearGradient>
         </defs>
@@ -213,7 +228,7 @@
         let client = null;
 
         // --- TWITCH CONNECTION ---
-        function connectToTwitch() {
+        async function connectToTwitch() {
             let channel = document.getElementById('channelInput').value.trim();
             const statusEl = document.getElementById('status');
             const btn = document.getElementById('connectBtn');
@@ -223,38 +238,64 @@
                 return;
             }
             
-            // Ensure channel name is lowercase for TMI
-            channel = channel.toLowerCase();
+            // Clean URL if pasted directly (e.g. https://twitch.tv/ninja -> ninja)
+            channel = channel.replace('https://', '')
+                             .replace('http://', '')
+                             .replace('www.', '')
+                             .replace('twitch.tv/', '')
+                             .replace('/', '')
+                             .toLowerCase();
 
-            // Reset client if exists
+            // Ensure we disconnect cleanly before reconnecting
             if (client) {
-                try { client.disconnect(); } catch(e) {}
+                statusEl.textContent = "Disconnecting previous session...";
+                try { 
+                    await client.disconnect(); 
+                } catch(e) {
+                    console.log("Disconnect warning:", e);
+                }
+                client = null;
             }
 
             statusEl.textContent = `Connecting to ${channel}...`;
             statusEl.className = "text-xs text-yellow-500 font-sans italic";
+            btn.disabled = true;
 
             // Configure TMI with secure connection settings
             client = new tmi.Client({
-                options: { debug: false },
+                options: { debug: true }, // Debug true helps see issues in console
                 connection: {
                     secure: true,
                     reconnect: true
                 },
-                channels: [channel]
+                // Explicitly add # to ensure TMI parses it as a channel immediately
+                channels: [`#${channel}`]
             });
 
+            // Connection Timeout Safety
+            const connectionTimeout = setTimeout(() => {
+                if(statusEl.textContent.includes('Connecting')) {
+                    statusEl.textContent = "Error: Connection timed out. Try refreshing the page.";
+                    statusEl.className = "text-xs text-red-500 font-sans italic";
+                    btn.disabled = false;
+                }
+            }, 10000);
+
             client.connect().then(() => {
+                clearTimeout(connectionTimeout);
                 statusEl.textContent = `Connected to ${channel}`;
                 statusEl.className = "text-xs text-green-500 font-sans italic";
                 btn.textContent = "CONNECTED";
                 btn.classList.replace('bg-amber-700', 'bg-green-800');
                 btn.classList.replace('hover:bg-amber-600', 'hover:bg-green-700');
+                btn.disabled = false;
                 document.getElementById('log').textContent = "Listening for points...";
             }).catch(err => {
+                clearTimeout(connectionTimeout);
                 console.error(err);
                 statusEl.textContent = `Error: ${err}`;
                 statusEl.className = "text-xs text-red-500 font-sans italic";
+                btn.disabled = false;
             });
 
             client.on('message', (channel, tags, message, self) => {
@@ -264,7 +305,7 @@
 
         // --- MESSAGE PARSING ---
         function parseMessage(msg, username) {
-            // Updated Regex to support English & Hungarian
+            // Regex to support English & Hungarian
             // Group 1: Number
             // Non-capturing: space + points OR pont(with optional suffix chars)
             // Non-capturing: space + to/for/a (optional)
@@ -287,6 +328,13 @@
                     }
                 }
             }
+        }
+
+        // --- MANUAL TEST FUNCTION ---
+        function manualAdd(house) {
+            updatePoints(house, 10);
+            triggerParticles(house, 10);
+            logEvent(`Test: 10 points to ${house}`);
         }
 
         function updatePoints(house, points) {
