@@ -79,7 +79,7 @@
         <!-- Canvas for particle effects sits on top -->
         <canvas id="particleCanvas"></canvas>
 
-        <!-- Gryffindor -->
+        <!-- Gryffindor / Griffendél -->
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="gryffindor">
             <div class="text-4xl font-bold mb-2 gryffindor-color score-display">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
@@ -105,10 +105,10 @@
                           fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400">GRYFFINDOR</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Griffendél</h2>
         </div>
 
-        <!-- Slytherin -->
+        <!-- Slytherin / Mardekár -->
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="slytherin">
             <div class="text-4xl font-bold mb-2 slytherin-color score-display">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
@@ -127,10 +127,10 @@
                           fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400">SLYTHERIN</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Mardekár</h2>
         </div>
 
-        <!-- Ravenclaw -->
+        <!-- Ravenclaw / Hollóhát -->
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="ravenclaw">
             <div class="text-4xl font-bold mb-2 ravenclaw-color score-display">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
@@ -149,10 +149,10 @@
                           fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400">RAVENCLAW</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Hollóhát</h2>
         </div>
 
-        <!-- Hufflepuff -->
+        <!-- Hufflepuff / Hugrabug -->
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container" data-house="hufflepuff">
             <div class="text-4xl font-bold mb-2 hufflepuff-color score-display">0</div>
             <div class="relative w-full max-w-[120px] h-[60vh]">
@@ -171,7 +171,7 @@
                           fill="url(#glassShine)" class="opacity-30 pointer-events-none"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400">HUFFLEPUFF</h2>
+            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl">Hugrabug</h2>
         </div>
     </div>
 
@@ -197,12 +197,24 @@
             ravenclaw:  { color: '#222f5b', maxPoints: 500, current: 0 },
             hufflepuff: { color: '#ecb939', maxPoints: 500, current: 0 }
         };
+        
+        // Mapping Hungarian/Alt names to main keys
+        const HOUSE_MAPPING = {
+            'gryffindor': 'gryffindor',
+            'griffendél': 'gryffindor',
+            'slytherin': 'slytherin',
+            'mardekár': 'slytherin',
+            'ravenclaw': 'ravenclaw',
+            'hollóhát': 'ravenclaw',
+            'hufflepuff': 'hufflepuff',
+            'hugrabug': 'hufflepuff'
+        };
 
         let client = null;
 
         // --- TWITCH CONNECTION ---
         function connectToTwitch() {
-            const channel = document.getElementById('channelInput').value.trim();
+            let channel = document.getElementById('channelInput').value.trim();
             const statusEl = document.getElementById('status');
             const btn = document.getElementById('connectBtn');
 
@@ -210,16 +222,25 @@
                 alert("Please enter a channel name!");
                 return;
             }
+            
+            // Ensure channel name is lowercase for TMI
+            channel = channel.toLowerCase();
 
             // Reset client if exists
             if (client) {
-                client.disconnect();
+                try { client.disconnect(); } catch(e) {}
             }
 
             statusEl.textContent = `Connecting to ${channel}...`;
             statusEl.className = "text-xs text-yellow-500 font-sans italic";
 
+            // Configure TMI with secure connection settings
             client = new tmi.Client({
+                options: { debug: false },
+                connection: {
+                    secure: true,
+                    reconnect: true
+                },
                 channels: [channel]
             });
 
@@ -231,6 +252,7 @@
                 btn.classList.replace('hover:bg-amber-600', 'hover:bg-green-700');
                 document.getElementById('log').textContent = "Listening for points...";
             }).catch(err => {
+                console.error(err);
                 statusEl.textContent = `Error: ${err}`;
                 statusEl.className = "text-xs text-red-500 font-sans italic";
             });
@@ -242,21 +264,26 @@
 
         // --- MESSAGE PARSING ---
         function parseMessage(msg, username) {
-            // Regex to find: [number] points [to/for] [house]
-            // Supports: "10 points to Gryffindor", "50 points for Slytherin", "-10 points to Ravenclaw"
-            const regex = /(-?\d+)\s+pont?\s+(?:a|az)?\s*(Griffendélnek|Mardekárnak|Hollóhátnak|Hugrabugnak)/i;
+            // Updated Regex to support English & Hungarian
+            // Group 1: Number
+            // Non-capturing: space + points OR pont(with optional suffix chars)
+            // Non-capturing: space + to/for/a (optional)
+            // Group 2: House Name (including Hungarian variants)
+            const regex = /(-?\d+)\s+(?:points?|pont[a-z]*)\s+(?:to|for|a)?\s*(gryffindor|slytherin|ravenclaw|hufflepuff|griffendél|mardekár|hollóhát|hugrabug)/i;
+            
             const match = msg.match(regex);
 
             if (match) {
                 const points = parseInt(match[1]);
-                const house = match[2].toLowerCase();
+                const rawHouse = match[2].toLowerCase();
+                const houseKey = HOUSE_MAPPING[rawHouse];
                 
-                if (!isNaN(points) && HOUSE_CONFIG[house]) {
-                    updatePoints(house, points);
-                    logEvent(`${username}: ${points} to ${house}`);
+                if (!isNaN(points) && houseKey && HOUSE_CONFIG[houseKey]) {
+                    updatePoints(houseKey, points);
+                    logEvent(`${username}: ${points} -> ${houseKey} (${rawHouse})`);
                     
                     if (points > 0) {
-                        triggerParticles(house, points);
+                        triggerParticles(houseKey, points);
                     }
                 }
             }
