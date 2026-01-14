@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 0.4</title>
+    <title>Hogwarts House Points 0.5 (Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Twitch Chat Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js"></script>
@@ -238,14 +238,20 @@
                 return;
             }
             
-            // Robust cleaning: remove URL parts, slashes, and # prefix if user added it
-            let channel = channelInput.replace('https://', '')
-                             .replace('http://', '')
-                             .replace('www.', '')
-                             .replace('twitch.tv/', '')
-                             .replace(/\//g, '') // Remove all slashes
-                             .replace(/#/g, '')  // Remove all hashes
-                             .toLowerCase();
+            // --- FIX: Proper sanitization from WebTuber ---
+            // 1. Remove protocol and common prefixes
+            let channel = channelInput.replace("https://", "")
+                                     .replace("http://", "")
+                                     .replace("www.", "")
+                                     .replace("twitch.tv/", "")
+                                     .replace("@", "")
+                                     .replace("#", "");
+
+            // 2. IMPORTANT: Split by slash to drop subpaths (like /videos or /clips)
+            // The previous bug was using .replace(/\//g, '') which merged "channel/videos" into "channelvideos"
+            channel = channel.split('/')[0].toLowerCase();
+
+            console.log("Connecting to sanitized channel:", channel);
 
             // Ensure we disconnect cleanly before reconnecting
             if (client) {
