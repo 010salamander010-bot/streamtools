@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 0.9 (Alignment Fix)</title>
+    <title>Hogwarts House Points 1.0 (Fixed Layers)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- ComfyJS Library (Wrapper for TMI.js) -->
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
 
     <style>
@@ -20,464 +18,333 @@
             overflow: hidden;
         }
 
-        /* Glass Shine Effect */
-        .glass-shine {
-            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.15) 40%, rgba(255,255,255,0) 100%);
-            pointer-events: none;
-        }
-
-        /* Text Shadows for readability */
-        .text-glow {
-            text-shadow: 0 0 10px currentColor;
-        }
-
-        /* House Specific Colors for Text/Glow */
+        /* Colors */
         .gryffindor-color { color: #ff4d4d; }
         .slytherin-color { color: #2ecc71; }
         .ravenclaw-color { color: #3498db; }
         .hufflepuff-color { color: #f1c40f; }
         
-        /* Custom Input Styling */
         .magic-input {
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #4a5568;
-            color: #e2e8f0;
-            transition: all 0.3s ease;
+            background: rgba(0, 0, 0, 0.5); border: 1px solid #4a5568; color: #e2e8f0; transition: all 0.3s ease;
         }
-        .magic-input:focus {
-            border-color: #f6ad55;
-            box-shadow: 0 0 10px rgba(246, 173, 85, 0.3);
-            outline: none;
-        }
+        .magic-input:focus { border-color: #f6ad55; outline: none; }
 
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-            z-index: 10; /* Behind the house containers which are z-20 */
-        }
-
-        /* Test Button Styling (Visible on Hover) */
-        .house-container:hover .test-btn {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .test-btn {
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.3s ease;
-        }
-
-        /* Hourglass Container Styling */
+        /* --- THE HOURGLASS STACKING --- */
         .hourglass-wrapper {
             position: relative;
-            width: 100%;
-            max-width: 120px;
-            height: 60vh;
+            width: 120px;
+            height: 360px; /* Fixed height for consistency */
+            margin: 0 auto;
         }
+
+        /* 1. BOTTOM LAYER: Falling Particles */
+        .sand-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0; 
+            pointer-events: none;
+        }
+
+        /* 2. MIDDLE LAYER: Rising Sand Pile */
+        .fill-container {
+            position: absolute;
+            bottom: 30px; /* Align with bottom bulb curvature */
+            left: 10px; right: 10px; /* Narrower than frame */
+            height: 140px; /* Max fill height of bottom bulb */
+            z-index: 10;
+            overflow: hidden;
+            border-bottom-left-radius: 50px;
+            border-bottom-right-radius: 50px;
+        }
+        .fill-level {
+            width: 100%;
+            height: 100%;
+            transform-origin: bottom;
+            transform: scaleY(0); /* Starts empty */
+            transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 3. TOP LAYER: Glass Frame & Shine */
+        .glass-frame {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 20;
+            pointer-events: none;
+        }
+        
+        /* Debug Button */
+        .test-btn {
+            opacity: 0; transform: translateY(10px); transition: all 0.3s ease;
+        }
+        .house-container:hover .test-btn { opacity: 1; transform: translateY(0); }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col items-center justify-between py-6">
 
-    <!-- Header / Controls -->
+    <!-- Header -->
     <div class="z-50 w-full max-w-4xl px-4 flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
-        <h1 class="text-3xl font-bold tracking-widest text-amber-500 text-center md:text-left drop-shadow-lg">HOUSE POINTS</h1>
-        
+        <h1 class="text-3xl font-bold tracking-widest text-amber-500 drop-shadow-lg">HOUSE POINTS</h1>
         <div class="flex gap-2 relative">
-            <input type="text" id="channelInput" placeholder="Twitch Channel Name" class="magic-input px-4 py-2 rounded font-sans text-sm w-48">
-            <button onclick="connectToTwitch()" id="connectBtn" class="bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded transition-colors text-sm font-sans border border-amber-800">
-                CONNECT
-            </button>
+            <input type="text" id="channelInput" placeholder="Twitch Channel" class="magic-input px-4 py-2 rounded font-sans text-sm w-48">
+            <button onclick="connectToTwitch()" id="connectBtn" class="bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded text-sm font-sans border border-amber-800">CONNECT</button>
         </div>
-        
         <div id="status" class="text-xs text-gray-500 font-sans italic">Status: Disconnected</div>
     </div>
 
-    <!-- Main Hourglass Display -->
-    <div class="flex-grow w-full max-w-6xl grid grid-cols-4 gap-4 px-4 items-end justify-items-center relative">
-        
-        <!-- Canvas for particle effects sits BEHIND the hourglasses (z-10 vs z-20) -->
-        <canvas id="particleCanvas"></canvas>
+    <!-- Main Grid -->
+    <div class="flex-grow w-full max-w-6xl grid grid-cols-4 gap-4 px-4 items-end justify-items-center">
 
-        <!-- Gryffindor / Griffendél -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="gryffindor">
-            <button onclick="manualAdd('gryffindor')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
-            <div class="text-4xl font-bold mb-2 gryffindor-color score-display drop-shadow-md">0</div>
+        <!-- GRYFFINDOR -->
+        <div class="house-container flex flex-col items-center w-full h-full justify-end" data-house="gryffindor">
+            <button onclick="manualAdd('gryffindor')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 gryffindor-color score-display">0</div>
+            
             <div class="hourglass-wrapper">
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl filter" style="filter: drop-shadow(0 0 15px rgba(255, 0, 0, 0.3));">
-                    <defs>
-                        <clipPath id="clip-gryffindor">
-                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
-                        </clipPath>
-                    </defs>
-                    
-                    <!-- Background Glass (Transparent fill so we see particles behind, stroke for frame) -->
-                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(0,0,0,0.3)" stroke="#4a1a1a" stroke-width="4"/>
+                <!-- Layer 1: Particles -->
+                <canvas class="sand-canvas" id="canvas-gryffindor"></canvas>
+                
+                <!-- Layer 2: Fill -->
+                <div class="fill-container">
+                    <div class="fill-level bg-[#740001]"></div>
+                </div>
 
-                    <!-- The Sand Pile (Fill Level) - Using height instead of scaleY for cleaner fill -->
-                    <rect x="0" y="300" width="100" height="0" fill="#740001" 
-                          class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-gryffindor); transform: scaleY(-1);" />
-                    
-                    <!-- Shine overlay (Topmost) -->
+                <!-- Layer 3: Frame -->
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
+                    <!-- Glass Tint -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
+                          fill="rgba(255,255,255,0.05)" stroke="#4a1a1a" stroke-width="4"/>
+                    <!-- Glare -->
+                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Griffendél</h2>
+            <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Griffendél</h2>
         </div>
 
-        <!-- Slytherin / Mardekár -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="slytherin">
-            <button onclick="manualAdd('slytherin')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
-            <div class="text-4xl font-bold mb-2 slytherin-color score-display drop-shadow-md">0</div>
+        <!-- SLYTHERIN -->
+        <div class="house-container flex flex-col items-center w-full h-full justify-end" data-house="slytherin">
+            <button onclick="manualAdd('slytherin')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 slytherin-color score-display">0</div>
+            
             <div class="hourglass-wrapper">
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(0, 255, 0, 0.3));">
-                    <defs>
-                        <clipPath id="clip-slytherin">
-                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
-                        </clipPath>
-                    </defs>
+                <canvas class="sand-canvas" id="canvas-slytherin"></canvas>
+                <div class="fill-container">
+                    <div class="fill-level bg-[#1a472a]"></div>
+                </div>
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(0,0,0,0.3)" stroke="#1a472a" stroke-width="4"/>
-                    
-                    <!-- Fixed fill using height/y -->
-                    <rect x="0" y="300" width="100" height="0" fill="#1a472a" 
-                          class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-slytherin); transform: scaleY(-1);" />
-
-                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
+                          fill="rgba(255,255,255,0.05)" stroke="#1a472a" stroke-width="4"/>
+                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Mardekár</h2>
+            <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Mardekár</h2>
         </div>
 
-        <!-- Ravenclaw / Hollóhát -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="ravenclaw">
-            <button onclick="manualAdd('ravenclaw')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
-            <div class="text-4xl font-bold mb-2 ravenclaw-color score-display drop-shadow-md">0</div>
+        <!-- RAVENCLAW -->
+        <div class="house-container flex flex-col items-center w-full h-full justify-end" data-house="ravenclaw">
+            <button onclick="manualAdd('ravenclaw')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 ravenclaw-color score-display">0</div>
+            
             <div class="hourglass-wrapper">
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(0, 0, 255, 0.3));">
-                    <defs>
-                        <clipPath id="clip-ravenclaw">
-                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
-                        </clipPath>
-                    </defs>
+                <canvas class="sand-canvas" id="canvas-ravenclaw"></canvas>
+                <div class="fill-container">
+                    <div class="fill-level bg-[#222f5b]"></div>
+                </div>
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(0,0,0,0.3)" stroke="#0e1a40" stroke-width="4"/>
-                    
-                     <!-- Fixed fill using height/y -->
-                    <rect x="0" y="300" width="100" height="0" fill="#222f5b" 
-                          class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-ravenclaw); transform: scaleY(-1);" />
-                          
-                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
+                          fill="rgba(255,255,255,0.05)" stroke="#0e1a40" stroke-width="4"/>
+                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Hollóhát</h2>
+            <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Hollóhát</h2>
         </div>
 
-        <!-- Hufflepuff / Hugrabug -->
-        <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="hufflepuff">
-            <button onclick="manualAdd('hufflepuff')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
-            <div class="text-4xl font-bold mb-2 hufflepuff-color score-display drop-shadow-md">0</div>
+        <!-- HUFFLEPUFF -->
+        <div class="house-container flex flex-col items-center w-full h-full justify-end" data-house="hufflepuff">
+            <button onclick="manualAdd('hufflepuff')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded text-gray-400">Test +10</button>
+            <div class="text-4xl font-bold mb-2 hufflepuff-color score-display">0</div>
+            
             <div class="hourglass-wrapper">
-                <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.3));">
-                    <defs>
-                        <clipPath id="clip-hufflepuff">
-                            <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" />
-                        </clipPath>
-                    </defs>
+                <canvas class="sand-canvas" id="canvas-hufflepuff"></canvas>
+                <div class="fill-container">
+                    <div class="fill-level bg-[#ecb939]"></div>
+                </div>
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(0,0,0,0.3)" stroke="#ecb939" stroke-width="4"/>
-                    
-                     <!-- Fixed fill using height/y -->
-                    <rect x="0" y="300" width="100" height="0" fill="#ecb939" 
-                          class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-hufflepuff); transform: scaleY(-1);" />
-                          
-                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
+                          fill="rgba(255,255,255,0.05)" stroke="#ecb939" stroke-width="4"/>
+                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
                 </svg>
             </div>
-            <h2 class="mt-4 text-xl tracking-widest text-gray-400 uppercase text-center text-sm md:text-xl font-bold">Hugrabug</h2>
+            <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Hugrabug</h2>
         </div>
     </div>
 
-    <!-- Global SVG Defs -->
-    <svg width="0" height="0">
-        <defs>
-            <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
-                <stop offset="50%" style="stop-color:rgb(255,255,255);stop-opacity:0.25" />
-                <stop offset="100%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
-            </linearGradient>
-        </defs>
-    </svg>
-
-    <!-- Recent Events Log (Optional, visible just to confirm logic) -->
-    <div id="log" class="text-[10px] text-gray-700 font-sans fixed bottom-2 right-2 opacity-50">Waiting for events...</div>
+    <!-- Log -->
+    <div id="log" class="text-[10px] text-gray-700 font-sans fixed bottom-2 right-2 opacity-50">Waiting...</div>
 
     <script>
-        // --- CONFIG & STATE ---
+        // --- CONFIG ---
         const HOUSE_CONFIG = {
             gryffindor: { color: '#740001', maxPoints: 500, current: 0 },
             slytherin:  { color: '#1a472a', maxPoints: 500, current: 0 },
             ravenclaw:  { color: '#222f5b', maxPoints: 500, current: 0 },
             hufflepuff: { color: '#ecb939', maxPoints: 500, current: 0 }
         };
-        
-        // Mapping Hungarian/Alt names to main keys
+
         const HOUSE_MAPPING = {
-            'gryffindor': 'gryffindor',
-            'griffendél': 'gryffindor',
-            'slytherin': 'slytherin',
-            'mardekár': 'slytherin',
-            'ravenclaw': 'ravenclaw',
-            'hollóhát': 'ravenclaw',
-            'hufflepuff': 'hufflepuff',
-            'hugrabug': 'hufflepuff'
+            'gryffindor': 'gryffindor', 'griffendél': 'gryffindor',
+            'slytherin': 'slytherin', 'mardekár': 'slytherin',
+            'ravenclaw': 'ravenclaw', 'hollóhát': 'ravenclaw',
+            'hufflepuff': 'hufflepuff', 'hugrabug': 'hufflepuff'
         };
 
-        // --- TWITCH CONNECTION ---
-        function connectToTwitch() {
-            let channelInput = document.getElementById('channelInput').value.trim();
-            const statusEl = document.getElementById('status');
-            const btn = document.getElementById('connectBtn');
-
-            if (!channelInput) {
-                alert("Please enter a channel name!");
-                return;
-            }
-            
-            // --- CLEAN INPUT ---
-            let channel = channelInput.replace("https://", "")
-                                     .replace("http://", "")
-                                     .replace("www.", "")
-                                     .replace("twitch.tv/", "")
-                                     .replace("@", "")
-                                     .replace("#", "");
-
-            // Split by slash to drop subpaths (e.g. /videos) and handle spaces
-            channel = channel.split('/')[0].toLowerCase().trim();
-
-            if (!channel) {
-                alert("Invalid channel name!");
-                return;
-            }
-
-            console.log("Connecting to channel:", channel);
-
-            // Disconnect previous instance if exists
-            try { ComfyJS.Disconnect(); } catch(e) {}
-
-            statusEl.textContent = `Connecting to ${channel}...`;
-            statusEl.className = "text-xs text-yellow-500 font-sans italic";
-            btn.disabled = true;
-
-            // --- COMFYJS EVENT HANDLERS ---
-            
-            ComfyJS.onChat = (user, message, flags, self, extra) => {
-                // Pass to existing parser logic
-                parseMessage(message, user);
-            };
-
-            ComfyJS.onConnected = (address, port, isFirstConnect) => {
-                statusEl.textContent = `Connected to ${channel}`;
-                statusEl.className = "text-xs text-green-500 font-sans italic";
-                btn.textContent = "CONNECTED";
-                btn.classList.replace('bg-amber-700', 'bg-green-800');
-                btn.classList.replace('hover:bg-amber-600', 'hover:bg-green-700');
-                btn.disabled = false;
-                document.getElementById('log').textContent = "Listening for points...";
-            };
-            
-            ComfyJS.onError = (error) => {
-                console.error("ComfyJS Error:", error);
-                statusEl.textContent = `Error: ${error}`;
-                statusEl.className = "text-xs text-red-500 font-sans italic";
-                btn.disabled = false;
-            };
-
-            // Init Connection
-            ComfyJS.Init(channel);
+        // --- CANVAS SETUP ---
+        // We now have 4 separate canvases, one for each house
+        const canvases = {};
+        const contexts = {};
+        
+        function initCanvases() {
+            ['gryffindor', 'slytherin', 'ravenclaw', 'hufflepuff'].forEach(house => {
+                const cvs = document.getElementById(`canvas-${house}`);
+                // Match the visual size of the wrapper
+                cvs.width = 120; 
+                cvs.height = 360;
+                canvases[house] = cvs;
+                contexts[house] = cvs.getContext('2d');
+            });
         }
+        window.addEventListener('load', initCanvases);
 
-        // --- MESSAGE PARSING ---
-        function parseMessage(msg, username) {
-            // Regex to support English & Hungarian
-            const regex = /(-?\d+)\s+(?:points?|pont[a-z]*)\s+(?:to|for|a)?\s*(gryffindor|slytherin|ravenclaw|hufflepuff|griffendél|mardekár|hollóhát|hugrabug)/i;
-            
-            const match = msg.match(regex);
-
-            if (match) {
-                const points = parseInt(match[1]);
-                const rawHouse = match[2].toLowerCase();
-                const houseKey = HOUSE_MAPPING[rawHouse];
-                
-                if (!isNaN(points) && houseKey && HOUSE_CONFIG[houseKey]) {
-                    updatePoints(houseKey, points);
-                    logEvent(`${username}: ${points} -> ${houseKey} (${rawHouse})`);
-                    
-                    if (points > 0) {
-                        triggerParticles(houseKey, points);
-                    }
-                }
-            }
-        }
-
-        // --- MANUAL TEST FUNCTION ---
-        function manualAdd(house) {
-            updatePoints(house, 10);
-            triggerParticles(house, 10);
-            logEvent(`Test: 10 points to ${house}`);
-        }
-
+        // --- LOGIC ---
         function updatePoints(house, points) {
             const config = HOUSE_CONFIG[house];
             config.current += points;
-            
-            // Prevent negative total points (optional rule)
             if (config.current < 0) config.current = 0;
 
-            // DOM Updates
             const container = document.querySelector(`.house-container[data-house="${house}"]`);
-            const scoreEl = container.querySelector('.score-display');
-            const fillRect = container.querySelector('.fill-rect');
-
-            // Update Number
-            scoreEl.textContent = config.current;
-
-            // Update Visual Fill (Fill by Height Percentage)
-            // We scale based on maxPoints (e.g., 500 points = full glass)
-            let percentage = (config.current / config.maxPoints) * 100;
-            if (percentage > 100) percentage = 100; 
-            if (percentage < 0) percentage = 0;
+            container.querySelector('.score-display').textContent = config.current;
             
-            // For SVG rect, we change the height attribute (via CSS/JS logic since we used rect height=0 in template)
-            // NOTE: SVG rect y grows down. To grow UP, we need to adjust y position and height.
-            // But we used a trick with transform: scaleY(-1) in the template to flip the coordinate system locally for the fill.
-            // So simply setting height = percentage should work relative to the transform origin (if we set it).
-            // Actually, safer to just use standard height and Y math:
-            // Full height is 300.
-            const fullHeight = 300;
-            const newHeight = (percentage / 100) * fullHeight;
-            
-            // Since we used transform: scaleY(-1) in the SVG definition, 'height' will grow "up" visually from y=300
-            fillRect.setAttribute('height', newHeight);
+            // FILL LOGIC: Simple scaleY on the inner div
+            const percentage = Math.min(config.current / config.maxPoints, 1);
+            container.querySelector('.fill-level').style.transform = `scaleY(${percentage})`;
         }
 
-        function logEvent(text) {
-            const log = document.getElementById('log');
-            log.textContent = text;
-            log.style.opacity = 1;
-            setTimeout(() => log.style.opacity = 0.5, 2000);
+        function manualAdd(house) {
+            updatePoints(house, 10);
+            triggerParticles(house, 10);
         }
 
-        // --- PARTICLE SYSTEM (THE GEMS) ---
-        const canvas = document.getElementById('particleCanvas');
-        const ctx = canvas.getContext('2d');
+        // --- PARTICLE SYSTEM ---
         let particles = [];
-
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas(); // Initial call moved to load listener to be safe, but kept here for fallback
 
         class Particle {
             constructor(house) {
-                // Find the house container position
-                const container = document.querySelector(`.house-container[data-house="${house}"]`);
-                // Important: Look for the specific hourglass SVG wrapper
-                const wrapper = container.querySelector('.hourglass-wrapper');
-                const rect = wrapper.getBoundingClientRect();
+                this.house = house;
+                // Spawn relative to local canvas (120x360)
+                // Top bulb area is roughly y=0 to y=140
+                this.x = 60 + (Math.random() * 60 - 30); // Center x=60, width +/- 30
+                this.y = 20; 
                 
-                // Spawn within the glass bulb width (approx 80px wide at top?)
-                // The SVG viewbox is 100 wide. Top bulb is roughly 10-90.
-                // We map this relative to the rendered width.
-                const spawnWidth = rect.width * 0.5; // narrower than full width
-                const centerX = rect.left + rect.width / 2;
-                
-                this.x = centerX + (Math.random() * spawnWidth - spawnWidth/2);
-                this.y = rect.top + 20; // Start inside the top bulb
-                
-                // Physics
-                this.vx = (Math.random() - 0.5) * 1; // Less horizontal jitter
-                this.vy = Math.random() * 2 + 2; // Initial downward velocity
-                this.gravity = 0.2;
-                
-                // Appearance
-                this.size = Math.random() * 3 + 2;
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vy = Math.random() * 3 + 2;
+                this.gravity = 0.15;
+                this.size = Math.random() * 2.5 + 1.5;
                 this.color = HOUSE_CONFIG[house].color;
-                this.life = 100; // Frames to live
-                
-                // Floor logic - roughly bottom of the visible glass
-                this.floor = rect.bottom - 20; 
-                
-                // Clip logic: If they fall "out" of the hourglass shape, we could kill them, 
-                // but just letting them fall 'behind' the mask is cleaner.
+                this.life = 100;
             }
-
             update() {
                 this.vy += this.gravity;
                 this.x += this.vx;
                 this.y += this.vy;
-
-                // Stop at bottom of hourglass
-                if (this.y > this.floor) {
-                    this.y = this.floor;
-                    this.vy *= -0.3; // Dampened bounce
-                    this.vx *= 0.8;
-                }
                 
+                // Narrowing at neck (approx y=150)
+                if (this.y > 130 && this.y < 170) {
+                    // Force towards center
+                    if (this.x < 55) this.vx += 0.2;
+                    if (this.x > 65) this.vx -= 0.2;
+                }
+
+                // Hit bottom pile (approx y=330)
+                if (this.y > 330) {
+                    this.y = 330;
+                    this.vy *= -0.4;
+                    this.vx *= 0.6;
+                }
                 this.life--;
             }
-
-            draw() {
+            draw(ctx) {
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
-                // Diamond shape for "gem" look
-                ctx.moveTo(this.x, this.y - this.size);
-                ctx.lineTo(this.x + this.size, this.y);
-                ctx.lineTo(this.x, this.y + this.size);
-                ctx.lineTo(this.x - this.size, this.y);
+                ctx.rect(this.x, this.y, this.size, this.size); // Simple square sand
                 ctx.fill();
             }
         }
 
         function triggerParticles(house, amount) {
-            // Cap particles to avoid lag if someone gives 1000 points
-            let count = Math.min(amount, 20); 
-            if (count < 5) count = 5; // Minimum burst
-
+            let count = Math.min(amount, 20);
+            if (count < 5) count = 5;
             for (let i = 0; i < count; i++) {
-                setTimeout(() => {
-                    particles.push(new Particle(house));
-                }, i * 50); // Stagger them
+                setTimeout(() => particles.push(new Particle(house)), i * 30);
             }
         }
 
-        function animateParticles() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
+        function animateLoop() {
+            // Clear all 4 canvases
+            Object.values(contexts).forEach(ctx => ctx.clearRect(0, 0, 120, 360));
+
             for (let i = 0; i < particles.length; i++) {
-                particles[i].update();
-                particles[i].draw();
+                let p = particles[i];
+                p.update();
+                // Draw on the specific house canvas
+                if (contexts[p.house]) p.draw(contexts[p.house]);
             }
-
-            // Remove dead particles
             particles = particles.filter(p => p.life > 0);
-            
-            requestAnimationFrame(animateParticles);
+            requestAnimationFrame(animateLoop);
         }
-        animateParticles();
+        animateLoop();
 
+        // --- TWITCH ---
+        function connectToTwitch() {
+            let channel = document.getElementById('channelInput').value.trim();
+            if (!channel) return alert("Enter channel!");
+            
+            // Clean input
+            channel = channel.replace(/^(?:https?:\/\/)?(?:www\.)?twitch\.tv\//, '').replace(/^#/, '').replace(/\/.*$/, '').toLowerCase();
+            
+            document.getElementById('status').textContent = `Connecting to ${channel}...`;
+            
+            ComfyJS.onChat = (user, message, flags, self, extra) => {
+                const regex = /(-?\d+)\s+(?:points?|pont[a-z]*)\s+(?:to|for|a)?\s*(gryffindor|slytherin|ravenclaw|hufflepuff|griffendél|mardekár|hollóhát|hugrabug)/i;
+                const match = message.match(regex);
+                if (match) {
+                    const pts = parseInt(match[1]);
+                    const house = HOUSE_MAPPING[match[2].toLowerCase()];
+                    if (house) {
+                        updatePoints(house, pts);
+                        if (pts > 0) triggerParticles(house, pts);
+                        // Log
+                        const log = document.getElementById('log');
+                        log.textContent = `${user}: ${pts} to ${house}`;
+                        log.style.opacity = 1; setTimeout(() => log.style.opacity = 0.5, 2000);
+                    }
+                }
+            };
+
+            ComfyJS.onConnected = () => {
+                const s = document.getElementById('status');
+                s.textContent = "Connected!";
+                s.className = "text-xs text-green-500 font-sans italic";
+                document.getElementById('connectBtn').textContent = "CONNECTED";
+                document.getElementById('connectBtn').classList.add('bg-green-700');
+            };
+
+            ComfyJS.Init(channel);
+        }
     </script>
 </body>
 </html>
