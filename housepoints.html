@@ -5,9 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hogwarts House Points</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Twitch Chat Library - Switched to unpkg for better reliability and added error handling -->
-    <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js" 
-            onerror="window.tmiLoadError = true; console.error('TMI failed to load');"></script>
+    
+    <!-- Robust Twitch Library Loader -->
+    <!-- Tries multiple sources to bypass firewalls/CDN issues -->
+    <script>
+        (function() {
+            const sources = [
+                "https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js",
+                "https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js",
+                "https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"
+            ];
+            
+            function loadScript(index) {
+                if (index >= sources.length) return; // All failed
+                
+                const script = document.createElement('script');
+                script.src = sources[index];
+                script.onload = () => console.log(`TMI loaded successfully from ${sources[index]}`);
+                script.onerror = () => {
+                    console.warn(`Failed to load from ${sources[index]}, trying backup...`);
+                    loadScript(index + 1);
+                };
+                document.head.appendChild(script);
+            }
+            
+            loadScript(0);
+        })();
+    </script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
 
@@ -228,6 +253,32 @@
 
         let client = null;
 
+        // --- CHECK FOR LIBRARY LOAD ---
+        window.addEventListener('load', () => {
+             resizeCanvas();
+             
+             // Check for TMI with a loop to allow fallbacks to load
+             let checks = 0;
+             const checkTmi = setInterval(() => {
+                 if (typeof tmi !== 'undefined') {
+                     clearInterval(checkTmi);
+                     console.log("Twitch library confirmed loaded.");
+                 } else {
+                     checks++;
+                     // Wait up to 3 seconds (15 * 200ms) for backups to load
+                     if (checks > 15) { 
+                         clearInterval(checkTmi);
+                         const statusEl = document.getElementById('status');
+                         const btn = document.getElementById('connectBtn');
+                         statusEl.textContent = "Error: Unable to load Twitch library. Check browser privacy/firewall.";
+                         statusEl.className = "text-xs text-red-500 font-sans italic font-bold";
+                         btn.disabled = true;
+                         btn.classList.add('opacity-50', 'cursor-not-allowed');
+                     }
+                 }
+             }, 200);
+        });
+
         // --- TWITCH CONNECTION ---
         async function connectToTwitch() {
             let channelInput = document.getElementById('channelInput').value.trim();
@@ -236,7 +287,7 @@
 
             // --- SAFETY CHECK: IS TMI LOADED? ---
             if (typeof tmi === 'undefined') {
-                statusEl.textContent = "Error: Twitch Library (tmi.js) failed to load. Check adblock/firewall.";
+                statusEl.textContent = "Error: Twitch Library (tmi.js) failed to load.";
                 statusEl.className = "text-xs text-red-500 font-sans italic font-bold";
                 return;
             }
@@ -397,7 +448,7 @@
             canvas.height = window.innerHeight;
         }
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        resizeCanvas(); // Initial call moved to load listener to be safe, but kept here for fallback
 
         class Particle {
             constructor(house) {
