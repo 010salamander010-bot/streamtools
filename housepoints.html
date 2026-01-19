@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 1.1 (Final Fix)</title>
+    <title>Hogwarts House Points 1.2 (Clean & Masked)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
 
@@ -37,32 +37,25 @@
             margin: 0 auto;
         }
 
-        /* 1. BOTTOM LAYER: Particles */
+        /* 1. BOTTOM LAYER: Particles (MASKED) */
         .sand-canvas {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 10;
             pointer-events: none;
+            /* Hard Clip to Hourglass Shape using relative coord clip-path */
+            /* M12,0 ... etc based on 120x360 container (1.2 scale of 100x300 path) */
+            clip-path: path("M12,0 L108,0 Q120,60 60,180 Q0,300 12,360 L108,360 Q120,300 60,180 Q0,60 12,0 Z");
         }
 
         /* 2. MIDDLE LAYER: Rising Sand Pile (MASKED) */
-        /* We mask this container to the hourglass shape so the square div inside gets cut off */
         .fill-mask {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 20;
-            /* SVG Path for masking */
-            clip-path: path("M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z");
-            /* Scale clip path to size if needed, but since viewBox 0 0 100 300 matches ratio, we rely on responsive SVG scaling logic or fixed pixels.
-               Actually, pure CSS clip-path: path() uses pixels.
-               To make it responsive to the 120x360 container, we need to scale the path coordinates:
-               100x300 -> 120x360 is exactly 1.2x scale.
-               
-               Scaled Path (1.2x):
-               M12,0 L108,0 Q120,60 60,180 Q0,300 12,360 L108,360 Q120,300 60,180 Q0,60 12,0 Z
-            */
+            /* Same clip path ensures fill stays inside */
             clip-path: path("M12,0 L108,0 Q120,60 60,180 Q0,300 12,360 L108,360 Q120,300 60,180 Q0,60 12,0 Z");
             pointer-events: none;
         }
@@ -76,6 +69,7 @@
         }
 
         /* 3. TOP LAYER: Frame Outline & Glare */
+        /* Note: We remove the internal stroke that was causing grey lines */
         .glass-frame {
             position: absolute;
             top: 0; left: 0;
@@ -112,22 +106,18 @@
             <div class="text-4xl font-bold mb-2 gryffindor-color score-display">0</div>
             
             <div class="hourglass-wrapper">
-                <!-- 1. Particles (Back) -->
                 <canvas class="sand-canvas" id="canvas-gryffindor"></canvas>
-                
-                <!-- 2. Rising Fill (Masked) -->
-                <div class="fill-mask">
-                    <div class="fill-level bg-[#740001]"></div>
-                </div>
-
-                <!-- 3. Frame (Front) -->
+                <div class="fill-mask"><div class="fill-level bg-[#740001]"></div></div>
                 <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
-                    <!-- Glass Tint -->
+                    <!-- Frame Only (No fill, thick stroke) -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#4a1a1a" stroke-width="4"/>
+                          fill="none" stroke="#4a1a1a" stroke-width="6"/>
+                    <!-- Glass Tint (Subtle, no stroke to avoid grey lines) -->
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="none"/>
                     <!-- Glare -->
-                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
-                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M25,20 Q55,70 30,130" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M30,170 Q65,240 25,280" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4" stroke-linecap="round"/>
                 </svg>
             </div>
             <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Griffendél</h2>
@@ -140,14 +130,14 @@
             
             <div class="hourglass-wrapper">
                 <canvas class="sand-canvas" id="canvas-slytherin"></canvas>
-                <div class="fill-mask">
-                    <div class="fill-level bg-[#1a472a]"></div>
-                </div>
+                <div class="fill-mask"><div class="fill-level bg-[#1a472a]"></div></div>
                 <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#1a472a" stroke-width="4"/>
-                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
-                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
+                          fill="none" stroke="#1a472a" stroke-width="6"/>
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="none"/>
+                    <path d="M25,20 Q55,70 30,130" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M30,170 Q65,240 25,280" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4" stroke-linecap="round"/>
                 </svg>
             </div>
             <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Mardekár</h2>
@@ -160,14 +150,14 @@
             
             <div class="hourglass-wrapper">
                 <canvas class="sand-canvas" id="canvas-ravenclaw"></canvas>
-                <div class="fill-mask">
-                    <div class="fill-level bg-[#222f5b]"></div>
-                </div>
+                <div class="fill-mask"><div class="fill-level bg-[#222f5b]"></div></div>
                 <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#0e1a40" stroke-width="4"/>
-                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
-                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
+                          fill="none" stroke="#0e1a40" stroke-width="6"/>
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="none"/>
+                    <path d="M25,20 Q55,70 30,130" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M30,170 Q65,240 25,280" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4" stroke-linecap="round"/>
                 </svg>
             </div>
             <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Hollóhát</h2>
@@ -180,14 +170,14 @@
             
             <div class="hourglass-wrapper">
                 <canvas class="sand-canvas" id="canvas-hufflepuff"></canvas>
-                <div class="fill-mask">
-                    <div class="fill-level bg-[#ecb939]"></div>
-                </div>
+                <div class="fill-mask"><div class="fill-level bg-[#ecb939]"></div></div>
                 <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.05)" stroke="#ecb939" stroke-width="4"/>
-                    <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
-                    <path d="M25,160 Q60,250 20,290" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round"/>
+                          fill="none" stroke="#ecb939" stroke-width="6"/>
+                    <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
+                          fill="rgba(255,255,255,0.05)" stroke="none"/>
+                    <path d="M25,20 Q55,70 30,130" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M30,170 Q65,240 25,280" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4" stroke-linecap="round"/>
                 </svg>
             </div>
             <h2 class="mt-4 text-xl font-bold tracking-widest text-gray-400">Hugrabug</h2>
@@ -237,9 +227,6 @@
             const container = document.querySelector(`.house-container[data-house="${house}"]`);
             container.querySelector('.score-display').textContent = config.current;
             
-            // FILL LOGIC: Height percentage
-            // We want it to fill the bottom bulb first? Or just linearly up?
-            // Simple linear fill for robustness.
             const percentage = Math.min(config.current / config.maxPoints, 1) * 100;
             container.querySelector('.fill-level').style.height = `${percentage}%`;
         }
@@ -256,37 +243,30 @@
             constructor(house) {
                 this.house = house;
                 // Spawn relative to local canvas (120x360)
-                // Top bulb is centered at x=60. 
-                // Width at top is wide, narrows at y=180.
-                this.x = 60 + (Math.random() * 40 - 20); 
+                this.x = 60 + (Math.random() * 60 - 30); 
                 this.y = 20; 
                 
-                this.vx = (Math.random() - 0.5) * 1;
+                this.vx = (Math.random() - 0.5) * 1.5;
                 this.vy = Math.random() * 3 + 2;
                 this.gravity = 0.15;
                 this.size = Math.random() * 2.5 + 1.5;
                 this.color = HOUSE_CONFIG[house].color;
-                this.life = 120;
+                this.life = 100;
             }
             update() {
                 this.vy += this.gravity;
                 this.x += this.vx;
                 this.y += this.vy;
                 
-                // Funnel Effect at Neck (approx y=180 is center)
-                // Neck is narrow, around 20px wide
-                if (this.y > 150 && this.y < 210) {
-                    const centerX = 60;
-                    const dist = this.x - centerX;
-                    // Push towards center strongly
-                    this.vx -= dist * 0.1;
+                if (this.y > 130 && this.y < 170) {
+                    if (this.x < 55) this.vx += 0.2;
+                    if (this.x > 65) this.vx -= 0.2;
                 }
 
-                // Pile up at bottom? Just fade out for now to keep it clean.
-                // Or bounce at absolute bottom
-                if (this.y > 350) {
-                    this.y = 350;
-                    this.vy *= -0.2;
+                if (this.y > 330) {
+                    this.y = 330;
+                    this.vy *= -0.4;
+                    this.vx *= 0.6;
                 }
                 this.life--;
             }
