@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 0.7 (ComfyJS)</title>
+    <title>Hogwarts House Points 0.8 (Visual Fixes)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- ComfyJS Library (Wrapper for TMI.js) -->
@@ -55,7 +55,7 @@
             top: 0;
             left: 0;
             pointer-events: none;
-            z-index: 10;
+            z-index: 10; /* Behind the house containers which are z-20 */
         }
 
         /* Test Button Styling (Visible on Hover) */
@@ -67,6 +67,20 @@
             opacity: 0;
             transform: translateY(10px);
             transition: all 0.3s ease;
+        }
+
+        /* Hourglass Container Styling */
+        .hourglass-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 120px;
+            height: 60vh;
+            /* Create a mask for the canvas behind it */
+            /* We use the SVG shape to "cut out" the background so we can see particles only here? 
+               Actually, simpler: Canvas is Z-10. Hourglass SVG is Z-20. 
+               The SVG has a transparent "window" area. 
+               The particles fall behind. 
+               We just need to align them perfectly. */
         }
     </style>
 </head>
@@ -89,15 +103,14 @@
     <!-- Main Hourglass Display -->
     <div class="flex-grow w-full max-w-6xl grid grid-cols-4 gap-4 px-4 items-end justify-items-center relative">
         
-        <!-- Canvas for particle effects sits on top -->
+        <!-- Canvas for particle effects sits BEHIND the hourglasses (z-10 vs z-20) -->
         <canvas id="particleCanvas"></canvas>
 
         <!-- Gryffindor / Griffendél -->
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="gryffindor">
             <button onclick="manualAdd('gryffindor')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
             <div class="text-4xl font-bold mb-2 gryffindor-color score-display drop-shadow-md">0</div>
-            <div class="relative w-full max-w-[120px] h-[60vh]">
-                <!-- SVG Hourglass Frame -->
+            <div class="hourglass-wrapper">
                 <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl filter" style="filter: drop-shadow(0 0 15px rgba(255, 0, 0, 0.3));">
                     <defs>
                         <clipPath id="clip-gryffindor">
@@ -105,16 +118,17 @@
                         </clipPath>
                     </defs>
                     
-                    <!-- Background Glass -->
+                    <!-- Background Glass (Transparent fill so we see particles behind, stroke for frame) -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.08)" stroke="#4a1a1a" stroke-width="2"/>
+                          fill="rgba(0,0,0,0.3)" stroke="#4a1a1a" stroke-width="4"/>
 
-                    <!-- The Sand/Gems (Fill) -->
+                    <!-- The Sand Pile (Fill Level) - Drawn ON TOP of particles but clipped to bottom -->
+                    <!-- We want particles to fall 'behind' this pile if they are 'in' it, or just merge. -->
                     <rect x="0" y="0" width="100" height="300" fill="#740001" 
                           class="transition-all duration-1000 ease-out fill-rect"
                           style="clip-path: url(#clip-gryffindor); transform-origin: bottom; transform: scaleY(0);" />
                     
-                    <!-- Shine overlay -->
+                    <!-- Shine overlay (Topmost) -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
@@ -126,7 +140,7 @@
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="slytherin">
             <button onclick="manualAdd('slytherin')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
             <div class="text-4xl font-bold mb-2 slytherin-color score-display drop-shadow-md">0</div>
-            <div class="relative w-full max-w-[120px] h-[60vh]">
+            <div class="hourglass-wrapper">
                 <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(0, 255, 0, 0.3));">
                     <defs>
                         <clipPath id="clip-slytherin">
@@ -134,7 +148,7 @@
                         </clipPath>
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.08)" stroke="#1a472a" stroke-width="2"/>
+                          fill="rgba(0,0,0,0.3)" stroke="#1a472a" stroke-width="4"/>
                     <rect x="0" y="0" width="100" height="300" fill="#1a472a" 
                           class="transition-all duration-1000 ease-out fill-rect"
                           style="clip-path: url(#clip-slytherin); transform-origin: bottom; transform: scaleY(0);" />
@@ -149,7 +163,7 @@
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="ravenclaw">
             <button onclick="manualAdd('ravenclaw')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
             <div class="text-4xl font-bold mb-2 ravenclaw-color score-display drop-shadow-md">0</div>
-            <div class="relative w-full max-w-[120px] h-[60vh]">
+            <div class="hourglass-wrapper">
                 <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(0, 0, 255, 0.3));">
                     <defs>
                         <clipPath id="clip-ravenclaw">
@@ -157,7 +171,7 @@
                         </clipPath>
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.08)" stroke="#0e1a40" stroke-width="2"/>
+                          fill="rgba(0,0,0,0.3)" stroke="#0e1a40" stroke-width="4"/>
                     <rect x="0" y="0" width="100" height="300" fill="#222f5b" 
                           class="transition-all duration-1000 ease-out fill-rect"
                           style="clip-path: url(#clip-ravenclaw); transform-origin: bottom; transform: scaleY(0);" />
@@ -172,7 +186,7 @@
         <div class="flex flex-col items-center w-full h-full justify-end relative z-20 house-container group" data-house="hufflepuff">
             <button onclick="manualAdd('hufflepuff')" class="test-btn mb-4 px-3 py-1 bg-gray-800 text-xs rounded border border-gray-600 hover:bg-gray-700 font-sans text-gray-400">Test +10</button>
             <div class="text-4xl font-bold mb-2 hufflepuff-color score-display drop-shadow-md">0</div>
-            <div class="relative w-full max-w-[120px] h-[60vh]">
+            <div class="hourglass-wrapper">
                 <svg viewBox="0 0 100 300" class="w-full h-full drop-shadow-2xl" style="filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.3));">
                     <defs>
                         <clipPath id="clip-hufflepuff">
@@ -180,7 +194,7 @@
                         </clipPath>
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
-                          fill="rgba(255,255,255,0.08)" stroke="#ecb939" stroke-width="2"/>
+                          fill="rgba(0,0,0,0.3)" stroke="#ecb939" stroke-width="4"/>
                     <rect x="0" y="0" width="100" height="300" fill="#ecb939" 
                           class="transition-all duration-1000 ease-out fill-rect"
                           style="clip-path: url(#clip-hufflepuff); transform-origin: bottom; transform: scaleY(0);" />
@@ -373,14 +387,21 @@
             constructor(house) {
                 // Find the house container position
                 const container = document.querySelector(`.house-container[data-house="${house}"]`);
-                const rect = container.getBoundingClientRect();
+                // Important: Look for the specific hourglass SVG wrapper
+                const wrapper = container.querySelector('.hourglass-wrapper');
+                const rect = wrapper.getBoundingClientRect();
                 
-                // Spawn at the top of the glass bulb
-                this.x = rect.left + rect.width / 2 + (Math.random() * 40 - 20); 
-                this.y = rect.top; // Start at top of container
+                // Spawn within the glass bulb width (approx 80px wide at top?)
+                // The SVG viewbox is 100 wide. Top bulb is roughly 10-90.
+                // We map this relative to the rendered width.
+                const spawnWidth = rect.width * 0.6; // slightly narrower than full width
+                const centerX = rect.left + rect.width / 2;
+                
+                this.x = centerX + (Math.random() * spawnWidth - spawnWidth/2);
+                this.y = rect.top + 20; // Start inside the top bulb
                 
                 // Physics
-                this.vx = (Math.random() - 0.5) * 2;
+                this.vx = (Math.random() - 0.5) * 1; // Less horizontal jitter
                 this.vy = Math.random() * 2 + 2; // Initial downward velocity
                 this.gravity = 0.2;
                 
@@ -389,9 +410,11 @@
                 this.color = HOUSE_CONFIG[house].color;
                 this.life = 100; // Frames to live
                 
-                // Floor (approximate middle of glass for simplicity or fill level)
-                // Let's make them fall to the bottom of the screen
+                // Floor logic - roughly bottom of the visible glass
                 this.floor = rect.bottom - 20; 
+                
+                // Clip logic: If they fall "out" of the hourglass shape, we could kill them, 
+                // but just letting them fall 'behind' the mask is cleaner.
             }
 
             update() {
@@ -399,11 +422,11 @@
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Bounce
+                // Stop at bottom of hourglass
                 if (this.y > this.floor) {
                     this.y = this.floor;
-                    this.vy *= -0.5; // Lose energy
-                    this.vx *= 0.8;  // Friction
+                    this.vy *= -0.3; // Dampened bounce
+                    this.vx *= 0.8;
                 }
                 
                 this.life--;
