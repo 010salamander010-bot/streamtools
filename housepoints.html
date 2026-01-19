@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 0.8 (Visual Fixes)</title>
+    <title>Hogwarts House Points 0.9 (Alignment Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- ComfyJS Library (Wrapper for TMI.js) -->
@@ -75,12 +75,6 @@
             width: 100%;
             max-width: 120px;
             height: 60vh;
-            /* Create a mask for the canvas behind it */
-            /* We use the SVG shape to "cut out" the background so we can see particles only here? 
-               Actually, simpler: Canvas is Z-10. Hourglass SVG is Z-20. 
-               The SVG has a transparent "window" area. 
-               The particles fall behind. 
-               We just need to align them perfectly. */
         }
     </style>
 </head>
@@ -122,11 +116,10 @@
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(0,0,0,0.3)" stroke="#4a1a1a" stroke-width="4"/>
 
-                    <!-- The Sand Pile (Fill Level) - Drawn ON TOP of particles but clipped to bottom -->
-                    <!-- We want particles to fall 'behind' this pile if they are 'in' it, or just merge. -->
-                    <rect x="0" y="0" width="100" height="300" fill="#740001" 
+                    <!-- The Sand Pile (Fill Level) - Using height instead of scaleY for cleaner fill -->
+                    <rect x="0" y="300" width="100" height="0" fill="#740001" 
                           class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-gryffindor); transform-origin: bottom; transform: scaleY(0);" />
+                          style="clip-path: url(#clip-gryffindor); transform: scaleY(-1);" />
                     
                     <!-- Shine overlay (Topmost) -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
@@ -149,9 +142,12 @@
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(0,0,0,0.3)" stroke="#1a472a" stroke-width="4"/>
-                    <rect x="0" y="0" width="100" height="300" fill="#1a472a" 
+                    
+                    <!-- Fixed fill using height/y -->
+                    <rect x="0" y="300" width="100" height="0" fill="#1a472a" 
                           class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-slytherin); transform-origin: bottom; transform: scaleY(0);" />
+                          style="clip-path: url(#clip-slytherin); transform: scaleY(-1);" />
+
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
@@ -172,9 +168,12 @@
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(0,0,0,0.3)" stroke="#0e1a40" stroke-width="4"/>
-                    <rect x="0" y="0" width="100" height="300" fill="#222f5b" 
+                    
+                     <!-- Fixed fill using height/y -->
+                    <rect x="0" y="300" width="100" height="0" fill="#222f5b" 
                           class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-ravenclaw); transform-origin: bottom; transform: scaleY(0);" />
+                          style="clip-path: url(#clip-ravenclaw); transform: scaleY(-1);" />
+                          
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
@@ -195,9 +194,12 @@
                     </defs>
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(0,0,0,0.3)" stroke="#ecb939" stroke-width="4"/>
-                    <rect x="0" y="0" width="100" height="300" fill="#ecb939" 
+                    
+                     <!-- Fixed fill using height/y -->
+                    <rect x="0" y="300" width="100" height="0" fill="#ecb939" 
                           class="transition-all duration-1000 ease-out fill-rect"
-                          style="clip-path: url(#clip-hufflepuff); transform-origin: bottom; transform: scaleY(0);" />
+                          style="clip-path: url(#clip-hufflepuff); transform: scaleY(-1);" />
+                          
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="url(#glassShine)" class="opacity-40 pointer-events-none"/>
                 </svg>
@@ -308,10 +310,6 @@
         // --- MESSAGE PARSING ---
         function parseMessage(msg, username) {
             // Regex to support English & Hungarian
-            // Group 1: Number
-            // Non-capturing: space + points OR pont(with optional suffix chars)
-            // Non-capturing: space + to/for/a (optional)
-            // Group 2: House Name (including Hungarian variants)
             const regex = /(-?\d+)\s+(?:points?|pont[a-z]*)\s+(?:to|for|a)?\s*(gryffindor|slytherin|ravenclaw|hufflepuff|griffendél|mardekár|hollóhát|hugrabug)/i;
             
             const match = msg.match(regex);
@@ -354,13 +352,23 @@
             // Update Number
             scoreEl.textContent = config.current;
 
-            // Update Visual Fill (Cap at 100% for visual purposes, but keep counting real score)
+            // Update Visual Fill (Fill by Height Percentage)
             // We scale based on maxPoints (e.g., 500 points = full glass)
-            let percentage = (config.current / config.maxPoints);
-            if (percentage > 1) percentage = 1; 
+            let percentage = (config.current / config.maxPoints) * 100;
+            if (percentage > 100) percentage = 100; 
             if (percentage < 0) percentage = 0;
             
-            fillRect.style.transform = `scaleY(${percentage})`;
+            // For SVG rect, we change the height attribute (via CSS/JS logic since we used rect height=0 in template)
+            // NOTE: SVG rect y grows down. To grow UP, we need to adjust y position and height.
+            // But we used a trick with transform: scaleY(-1) in the template to flip the coordinate system locally for the fill.
+            // So simply setting height = percentage should work relative to the transform origin (if we set it).
+            // Actually, safer to just use standard height and Y math:
+            // Full height is 300.
+            const fullHeight = 300;
+            const newHeight = (percentage / 100) * fullHeight;
+            
+            // Since we used transform: scaleY(-1) in the SVG definition, 'height' will grow "up" visually from y=300
+            fillRect.setAttribute('height', newHeight);
         }
 
         function logEvent(text) {
@@ -380,8 +388,7 @@
             canvas.height = window.innerHeight;
         }
         window.addEventListener('resize', resizeCanvas);
-        // Initial resize handled on load implicitly or here
-        resizeCanvas();
+        resizeCanvas(); // Initial call moved to load listener to be safe, but kept here for fallback
 
         class Particle {
             constructor(house) {
@@ -394,7 +401,7 @@
                 // Spawn within the glass bulb width (approx 80px wide at top?)
                 // The SVG viewbox is 100 wide. Top bulb is roughly 10-90.
                 // We map this relative to the rendered width.
-                const spawnWidth = rect.width * 0.6; // slightly narrower than full width
+                const spawnWidth = rect.width * 0.5; // narrower than full width
                 const centerX = rect.left + rect.width / 2;
                 
                 this.x = centerX + (Math.random() * spawnWidth - spawnWidth/2);
