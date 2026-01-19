@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points</title>
+    <title>Hogwarts House Points 0.6 (Robust)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Robust Twitch Library Loader -->
-    <!-- Tries multiple sources to bypass firewalls/CDN issues -->
     <script>
         (function() {
             const sources = [
@@ -17,7 +16,17 @@
             ];
             
             function loadScript(index) {
-                if (index >= sources.length) return; // All failed
+                if (index >= sources.length) {
+                    console.error("All TMI sources failed.");
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const s = document.getElementById('status');
+                        if(s) {
+                            s.textContent = "Error: Could not load Twitch Library. Check firewall.";
+                            s.className = "text-xs text-red-500 font-sans italic font-bold";
+                        }
+                    });
+                    return; 
+                }
                 
                 const script = document.createElement('script');
                 script.src = sources[index];
@@ -253,32 +262,6 @@
 
         let client = null;
 
-        // --- CHECK FOR LIBRARY LOAD ---
-        window.addEventListener('load', () => {
-             resizeCanvas();
-             
-             // Check for TMI with a loop to allow fallbacks to load
-             let checks = 0;
-             const checkTmi = setInterval(() => {
-                 if (typeof tmi !== 'undefined') {
-                     clearInterval(checkTmi);
-                     console.log("Twitch library confirmed loaded.");
-                 } else {
-                     checks++;
-                     // Wait up to 3 seconds (15 * 200ms) for backups to load
-                     if (checks > 15) { 
-                         clearInterval(checkTmi);
-                         const statusEl = document.getElementById('status');
-                         const btn = document.getElementById('connectBtn');
-                         statusEl.textContent = "Error: Unable to load Twitch library. Check browser privacy/firewall.";
-                         statusEl.className = "text-xs text-red-500 font-sans italic font-bold";
-                         btn.disabled = true;
-                         btn.classList.add('opacity-50', 'cursor-not-allowed');
-                     }
-                 }
-             }, 200);
-        });
-
         // --- TWITCH CONNECTION ---
         async function connectToTwitch() {
             let channelInput = document.getElementById('channelInput').value.trim();
@@ -287,7 +270,7 @@
 
             // --- SAFETY CHECK: IS TMI LOADED? ---
             if (typeof tmi === 'undefined') {
-                statusEl.textContent = "Error: Twitch Library (tmi.js) failed to load.";
+                statusEl.textContent = "Error: Twitch Library (tmi.js) still loading...";
                 statusEl.className = "text-xs text-red-500 font-sans italic font-bold";
                 return;
             }
@@ -297,14 +280,20 @@
                 return;
             }
             
-            // Robust cleaning: remove URL parts, slashes, and # prefix if user added it
-            let channel = channelInput.replace('https://', '')
-                             .replace('http://', '')
-                             .replace('www.', '')
-                             .replace('twitch.tv/', '')
-                             .replace(/\//g, '') // Remove all slashes
-                             .replace(/#/g, '')  // Remove all hashes
-                             .toLowerCase();
+            // --- FIX: Proper sanitization from WebTuber ---
+            // 1. Remove protocol and common prefixes
+            let channel = channelInput.replace("https://", "")
+                                     .replace("http://", "")
+                                     .replace("www.", "")
+                                     .replace("twitch.tv/", "")
+                                     .replace("@", "")
+                                     .replace("#", "");
+
+            // 2. IMPORTANT: Split by slash to drop subpaths (like /videos or /clips)
+            // The previous bug was using .replace(/\//g, '') which merged "channel/videos" into "channelvideos"
+            channel = channel.split('/')[0].toLowerCase();
+
+            console.log("Connecting to sanitized channel:", channel);
 
             // Ensure we disconnect cleanly before reconnecting
             if (client) {
@@ -448,7 +437,7 @@
             canvas.height = window.innerHeight;
         }
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas(); // Initial call moved to load listener to be safe, but kept here for fallback
+        resizeCanvas();
 
         class Particle {
             constructor(house) {
