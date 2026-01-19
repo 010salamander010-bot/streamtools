@@ -3,44 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 0.6 (Robust)</title>
+    <title>Hogwarts House Points 0.7 (ComfyJS)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Robust Twitch Library Loader -->
-    <script>
-        (function() {
-            const sources = [
-                "https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js",
-                "https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js",
-                "https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"
-            ];
-            
-            function loadScript(index) {
-                if (index >= sources.length) {
-                    console.error("All TMI sources failed.");
-                    document.addEventListener('DOMContentLoaded', () => {
-                        const s = document.getElementById('status');
-                        if(s) {
-                            s.textContent = "Error: Could not load Twitch Library. Check firewall.";
-                            s.className = "text-xs text-red-500 font-sans italic font-bold";
-                        }
-                    });
-                    return; 
-                }
-                
-                const script = document.createElement('script');
-                script.src = sources[index];
-                script.onload = () => console.log(`TMI loaded successfully from ${sources[index]}`);
-                script.onerror = () => {
-                    console.warn(`Failed to load from ${sources[index]}, trying backup...`);
-                    loadScript(index + 1);
-                };
-                document.head.appendChild(script);
-            }
-            
-            loadScript(0);
-        })();
-    </script>
+    <!-- ComfyJS Library (Wrapper for TMI.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
@@ -260,28 +227,18 @@
             'hugrabug': 'hufflepuff'
         };
 
-        let client = null;
-
         // --- TWITCH CONNECTION ---
-        async function connectToTwitch() {
+        function connectToTwitch() {
             let channelInput = document.getElementById('channelInput').value.trim();
             const statusEl = document.getElementById('status');
             const btn = document.getElementById('connectBtn');
-
-            // --- SAFETY CHECK: IS TMI LOADED? ---
-            if (typeof tmi === 'undefined') {
-                statusEl.textContent = "Error: Twitch Library (tmi.js) still loading...";
-                statusEl.className = "text-xs text-red-500 font-sans italic font-bold";
-                return;
-            }
 
             if (!channelInput) {
                 alert("Please enter a channel name!");
                 return;
             }
             
-            // --- FIX: Proper sanitization from WebTuber ---
-            // 1. Remove protocol and common prefixes
+            // --- CLEAN INPUT ---
             let channel = channelInput.replace("https://", "")
                                      .replace("http://", "")
                                      .replace("www.", "")
@@ -289,49 +246,31 @@
                                      .replace("@", "")
                                      .replace("#", "");
 
-            // 2. IMPORTANT: Split by slash to drop subpaths (like /videos or /clips)
-            // The previous bug was using .replace(/\//g, '') which merged "channel/videos" into "channelvideos"
-            channel = channel.split('/')[0].toLowerCase();
+            // Split by slash to drop subpaths (e.g. /videos) and handle spaces
+            channel = channel.split('/')[0].toLowerCase().trim();
 
-            console.log("Connecting to sanitized channel:", channel);
-
-            // Ensure we disconnect cleanly before reconnecting
-            if (client) {
-                statusEl.textContent = "Disconnecting previous session...";
-                try { 
-                    await client.disconnect(); 
-                } catch(e) {
-                    console.log("Disconnect warning:", e);
-                }
-                client = null;
+            if (!channel) {
+                alert("Invalid channel name!");
+                return;
             }
+
+            console.log("Connecting to channel:", channel);
+
+            // Disconnect previous instance if exists
+            try { ComfyJS.Disconnect(); } catch(e) {}
 
             statusEl.textContent = `Connecting to ${channel}...`;
             statusEl.className = "text-xs text-yellow-500 font-sans italic";
             btn.disabled = true;
 
-            // Configure TMI
-            client = new tmi.Client({
-                options: { debug: true },
-                connection: {
-                    secure: true,
-                    reconnect: true
-                },
-                channels: [`#${channel}`]
-            });
+            // --- COMFYJS EVENT HANDLERS ---
+            
+            ComfyJS.onChat = (user, message, flags, self, extra) => {
+                // Pass to existing parser logic
+                parseMessage(message, user);
+            };
 
-            // Set up a safety timeout
-            const connectionTimeout = setTimeout(() => {
-                if(statusEl.textContent.includes('Connecting')) {
-                    statusEl.textContent = "Taking longer than usual... (Check firewall/adblock)";
-                    statusEl.className = "text-xs text-orange-500 font-sans italic";
-                    btn.disabled = false; // Allow them to try again
-                }
-            }, 8000);
-
-            // Listen for the 'connected' event specifically (more reliable than promise)
-            client.on('connected', (address, port) => {
-                clearTimeout(connectionTimeout);
+            ComfyJS.onConnected = (address, port, isFirstConnect) => {
                 statusEl.textContent = `Connected to ${channel}`;
                 statusEl.className = "text-xs text-green-500 font-sans italic";
                 btn.textContent = "CONNECTED";
@@ -339,27 +278,17 @@
                 btn.classList.replace('hover:bg-amber-600', 'hover:bg-green-700');
                 btn.disabled = false;
                 document.getElementById('log').textContent = "Listening for points...";
-            });
-
-            client.on('disconnected', (reason) => {
-                 statusEl.textContent = `Disconnected: ${reason}`;
-                 statusEl.className = "text-xs text-gray-500 font-sans italic";
-                 btn.textContent = "CONNECT";
-                 btn.classList.replace('bg-green-800', 'bg-amber-700');
-            });
-
-            // Connect
-            client.connect().catch(err => {
-                clearTimeout(connectionTimeout);
-                console.error(err);
-                statusEl.textContent = `Error: ${err}`;
+            };
+            
+            ComfyJS.onError = (error) => {
+                console.error("ComfyJS Error:", error);
+                statusEl.textContent = `Error: ${error}`;
                 statusEl.className = "text-xs text-red-500 font-sans italic";
                 btn.disabled = false;
-            });
+            };
 
-            client.on('message', (channel, tags, message, self) => {
-                parseMessage(message, tags['display-name']);
-            });
+            // Init Connection
+            ComfyJS.Init(channel);
         }
 
         // --- MESSAGE PARSING ---
@@ -437,6 +366,7 @@
             canvas.height = window.innerHeight;
         }
         window.addEventListener('resize', resizeCanvas);
+        // Initial resize handled on load implicitly or here
         resizeCanvas();
 
         class Particle {
