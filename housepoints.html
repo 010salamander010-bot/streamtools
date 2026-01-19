@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 0.5 (Fixed)</title>
+    <title>Hogwarts House Points</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Twitch Chat Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js"></script>
+    <!-- Twitch Chat Library - Switched to unpkg for better reliability and added error handling -->
+    <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js" 
+            onerror="window.tmiLoadError = true; console.error('TMI failed to load');"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
 
@@ -233,25 +234,26 @@
             const statusEl = document.getElementById('status');
             const btn = document.getElementById('connectBtn');
 
+            // --- SAFETY CHECK: IS TMI LOADED? ---
+            if (typeof tmi === 'undefined') {
+                statusEl.textContent = "Error: Twitch Library (tmi.js) failed to load. Check adblock/firewall.";
+                statusEl.className = "text-xs text-red-500 font-sans italic font-bold";
+                return;
+            }
+
             if (!channelInput) {
                 alert("Please enter a channel name!");
                 return;
             }
             
-            // --- FIX: Proper sanitization from WebTuber ---
-            // 1. Remove protocol and common prefixes
-            let channel = channelInput.replace("https://", "")
-                                     .replace("http://", "")
-                                     .replace("www.", "")
-                                     .replace("twitch.tv/", "")
-                                     .replace("@", "")
-                                     .replace("#", "");
-
-            // 2. IMPORTANT: Split by slash to drop subpaths (like /videos or /clips)
-            // The previous bug was using .replace(/\//g, '') which merged "channel/videos" into "channelvideos"
-            channel = channel.split('/')[0].toLowerCase();
-
-            console.log("Connecting to sanitized channel:", channel);
+            // Robust cleaning: remove URL parts, slashes, and # prefix if user added it
+            let channel = channelInput.replace('https://', '')
+                             .replace('http://', '')
+                             .replace('www.', '')
+                             .replace('twitch.tv/', '')
+                             .replace(/\//g, '') // Remove all slashes
+                             .replace(/#/g, '')  // Remove all hashes
+                             .toLowerCase();
 
             // Ensure we disconnect cleanly before reconnecting
             if (client) {
