@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts House Points 1.0 (Fixed Layers)</title>
+    <title>Hogwarts House Points 1.1 (Final Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
 
@@ -29,51 +29,61 @@
         }
         .magic-input:focus { border-color: #f6ad55; outline: none; }
 
-        /* --- THE HOURGLASS STACKING --- */
+        /* --- HOURGLASS CONTAINER --- */
         .hourglass-wrapper {
             position: relative;
             width: 120px;
-            height: 360px; /* Fixed height for consistency */
+            height: 360px;
             margin: 0 auto;
         }
 
-        /* 1. BOTTOM LAYER: Falling Particles */
+        /* 1. BOTTOM LAYER: Particles */
         .sand-canvas {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            z-index: 0; 
+            z-index: 10;
             pointer-events: none;
         }
 
-        /* 2. MIDDLE LAYER: Rising Sand Pile */
-        .fill-container {
-            position: absolute;
-            bottom: 30px; /* Align with bottom bulb curvature */
-            left: 10px; right: 10px; /* Narrower than frame */
-            height: 140px; /* Max fill height of bottom bulb */
-            z-index: 10;
-            overflow: hidden;
-            border-bottom-left-radius: 50px;
-            border-bottom-right-radius: 50px;
-        }
-        .fill-level {
-            width: 100%;
-            height: 100%;
-            transform-origin: bottom;
-            transform: scaleY(0); /* Starts empty */
-            transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* 3. TOP LAYER: Glass Frame & Shine */
-        .glass-frame {
+        /* 2. MIDDLE LAYER: Rising Sand Pile (MASKED) */
+        /* We mask this container to the hourglass shape so the square div inside gets cut off */
+        .fill-mask {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 20;
+            /* SVG Path for masking */
+            clip-path: path("M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z");
+            /* Scale clip path to size if needed, but since viewBox 0 0 100 300 matches ratio, we rely on responsive SVG scaling logic or fixed pixels.
+               Actually, pure CSS clip-path: path() uses pixels.
+               To make it responsive to the 120x360 container, we need to scale the path coordinates:
+               100x300 -> 120x360 is exactly 1.2x scale.
+               
+               Scaled Path (1.2x):
+               M12,0 L108,0 Q120,60 60,180 Q0,300 12,360 L108,360 Q120,300 60,180 Q0,60 12,0 Z
+            */
+            clip-path: path("M12,0 L108,0 Q120,60 60,180 Q0,300 12,360 L108,360 Q120,300 60,180 Q0,60 12,0 Z");
             pointer-events: none;
         }
         
+        .fill-level {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%;
+            height: 0%; /* Grows to 100% */
+            transition: height 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 3. TOP LAYER: Frame Outline & Glare */
+        .glass-frame {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 30;
+            pointer-events: none;
+        }
+
         /* Debug Button */
         .test-btn {
             opacity: 0; transform: translateY(10px); transition: all 0.3s ease;
@@ -102,16 +112,16 @@
             <div class="text-4xl font-bold mb-2 gryffindor-color score-display">0</div>
             
             <div class="hourglass-wrapper">
-                <!-- Layer 1: Particles -->
+                <!-- 1. Particles (Back) -->
                 <canvas class="sand-canvas" id="canvas-gryffindor"></canvas>
                 
-                <!-- Layer 2: Fill -->
-                <div class="fill-container">
+                <!-- 2. Rising Fill (Masked) -->
+                <div class="fill-mask">
                     <div class="fill-level bg-[#740001]"></div>
                 </div>
 
-                <!-- Layer 3: Frame -->
-                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
+                <!-- 3. Frame (Front) -->
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
                     <!-- Glass Tint -->
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(255,255,255,0.05)" stroke="#4a1a1a" stroke-width="4"/>
@@ -130,10 +140,10 @@
             
             <div class="hourglass-wrapper">
                 <canvas class="sand-canvas" id="canvas-slytherin"></canvas>
-                <div class="fill-container">
+                <div class="fill-mask">
                     <div class="fill-level bg-[#1a472a]"></div>
                 </div>
-                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(255,255,255,0.05)" stroke="#1a472a" stroke-width="4"/>
                     <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
@@ -150,10 +160,10 @@
             
             <div class="hourglass-wrapper">
                 <canvas class="sand-canvas" id="canvas-ravenclaw"></canvas>
-                <div class="fill-container">
+                <div class="fill-mask">
                     <div class="fill-level bg-[#222f5b]"></div>
                 </div>
-                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(255,255,255,0.05)" stroke="#0e1a40" stroke-width="4"/>
                     <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
@@ -170,10 +180,10 @@
             
             <div class="hourglass-wrapper">
                 <canvas class="sand-canvas" id="canvas-hufflepuff"></canvas>
-                <div class="fill-container">
+                <div class="fill-mask">
                     <div class="fill-level bg-[#ecb939]"></div>
                 </div>
-                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl">
+                <svg viewBox="0 0 100 300" class="glass-frame drop-shadow-2xl" preserveAspectRatio="none">
                     <path d="M10,0 L90,0 Q100,50 50,150 Q0,250 10,300 L90,300 Q100,250 50,150 Q0,50 10,0 Z" 
                           fill="rgba(255,255,255,0.05)" stroke="#ecb939" stroke-width="4"/>
                     <path d="M20,10 Q50,60 25,140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
@@ -184,7 +194,6 @@
         </div>
     </div>
 
-    <!-- Log -->
     <div id="log" class="text-[10px] text-gray-700 font-sans fixed bottom-2 right-2 opacity-50">Waiting...</div>
 
     <script>
@@ -204,14 +213,13 @@
         };
 
         // --- CANVAS SETUP ---
-        // We now have 4 separate canvases, one for each house
         const canvases = {};
         const contexts = {};
         
         function initCanvases() {
             ['gryffindor', 'slytherin', 'ravenclaw', 'hufflepuff'].forEach(house => {
                 const cvs = document.getElementById(`canvas-${house}`);
-                // Match the visual size of the wrapper
+                // Match the container dimensions exactly
                 cvs.width = 120; 
                 cvs.height = 360;
                 canvases[house] = cvs;
@@ -229,9 +237,11 @@
             const container = document.querySelector(`.house-container[data-house="${house}"]`);
             container.querySelector('.score-display').textContent = config.current;
             
-            // FILL LOGIC: Simple scaleY on the inner div
-            const percentage = Math.min(config.current / config.maxPoints, 1);
-            container.querySelector('.fill-level').style.transform = `scaleY(${percentage})`;
+            // FILL LOGIC: Height percentage
+            // We want it to fill the bottom bulb first? Or just linearly up?
+            // Simple linear fill for robustness.
+            const percentage = Math.min(config.current / config.maxPoints, 1) * 100;
+            container.querySelector('.fill-level').style.height = `${percentage}%`;
         }
 
         function manualAdd(house) {
@@ -246,41 +256,44 @@
             constructor(house) {
                 this.house = house;
                 // Spawn relative to local canvas (120x360)
-                // Top bulb area is roughly y=0 to y=140
-                this.x = 60 + (Math.random() * 60 - 30); // Center x=60, width +/- 30
+                // Top bulb is centered at x=60. 
+                // Width at top is wide, narrows at y=180.
+                this.x = 60 + (Math.random() * 40 - 20); 
                 this.y = 20; 
                 
-                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vx = (Math.random() - 0.5) * 1;
                 this.vy = Math.random() * 3 + 2;
                 this.gravity = 0.15;
                 this.size = Math.random() * 2.5 + 1.5;
                 this.color = HOUSE_CONFIG[house].color;
-                this.life = 100;
+                this.life = 120;
             }
             update() {
                 this.vy += this.gravity;
                 this.x += this.vx;
                 this.y += this.vy;
                 
-                // Narrowing at neck (approx y=150)
-                if (this.y > 130 && this.y < 170) {
-                    // Force towards center
-                    if (this.x < 55) this.vx += 0.2;
-                    if (this.x > 65) this.vx -= 0.2;
+                // Funnel Effect at Neck (approx y=180 is center)
+                // Neck is narrow, around 20px wide
+                if (this.y > 150 && this.y < 210) {
+                    const centerX = 60;
+                    const dist = this.x - centerX;
+                    // Push towards center strongly
+                    this.vx -= dist * 0.1;
                 }
 
-                // Hit bottom pile (approx y=330)
-                if (this.y > 330) {
-                    this.y = 330;
-                    this.vy *= -0.4;
-                    this.vx *= 0.6;
+                // Pile up at bottom? Just fade out for now to keep it clean.
+                // Or bounce at absolute bottom
+                if (this.y > 350) {
+                    this.y = 350;
+                    this.vy *= -0.2;
                 }
                 this.life--;
             }
             draw(ctx) {
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
-                ctx.rect(this.x, this.y, this.size, this.size); // Simple square sand
+                ctx.rect(this.x, this.y, this.size, this.size);
                 ctx.fill();
             }
         }
@@ -294,13 +307,11 @@
         }
 
         function animateLoop() {
-            // Clear all 4 canvases
             Object.values(contexts).forEach(ctx => ctx.clearRect(0, 0, 120, 360));
 
             for (let i = 0; i < particles.length; i++) {
                 let p = particles[i];
                 p.update();
-                // Draw on the specific house canvas
                 if (contexts[p.house]) p.draw(contexts[p.house]);
             }
             particles = particles.filter(p => p.life > 0);
@@ -313,7 +324,6 @@
             let channel = document.getElementById('channelInput').value.trim();
             if (!channel) return alert("Enter channel!");
             
-            // Clean input
             channel = channel.replace(/^(?:https?:\/\/)?(?:www\.)?twitch\.tv\//, '').replace(/^#/, '').replace(/\/.*$/, '').toLowerCase();
             
             document.getElementById('status').textContent = `Connecting to ${channel}...`;
@@ -327,7 +337,6 @@
                     if (house) {
                         updatePoints(house, pts);
                         if (pts > 0) triggerParticles(house, pts);
-                        // Log
                         const log = document.getElementById('log');
                         log.textContent = `${user}: ${pts} to ${house}`;
                         log.style.opacity = 1; setTimeout(() => log.style.opacity = 0.5, 2000);
