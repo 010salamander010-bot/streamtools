@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Raid: Manager & Stream</title>
+    <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <style>
+        :root { --bg-dark: #1a1a1a; --bg-panel: #2d2d2d; --accent: #9147ff; --text: #ffffff; }
+        body { background-color: var(--bg-dark); color: var(--text); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        nav { background: #000; padding: 0 20px; height: 50px; display: flex; align-items: center; border-bottom: 2px solid #333; box-shadow: 0 2px 10px rgba(0,0,0,0.5); z-index: 100; transition: transform 0.3s; }
+        nav h1 { margin: 0 20px 0 0; font-size: 18px; color: var(--accent); }
+        .nav-btn { background: transparent; border: none; color: #888; padding: 10px 15px; cursor: pointer; font-weight: bold; transition: 0.2s; border-bottom: 3px solid transparent; }
+        .nav-btn:hover { color: white; }
+        .nav-btn.active { color: white; border-bottom: 3px solid var(--accent); }
+        
+        #main-view { flex: 1; position: relative; overflow: hidden; display: flex; }
+        .view-section { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; background: var(--bg-dark); }
+        .view-section.active { display: flex; width: 100%; height: 100%; }
+        
+        #stream-view { height: 100%; }
+        #stream-container { flex: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; position: relative; border-right: 2px solid #333; overflow: hidden; }
+        #chat-container { flex: 1; background: #18181b; display: flex; flex-direction: column; min-width: 300px; max-width: 400px; border-left: 1px solid #333; transition: margin-right 0.3s; }
+        
+        #chat-controls { padding: 10px; background: #222; border-top: 1px solid #333; display: flex; flex-direction: column; gap: 5px; }
+        #chat-controls select, #chat-controls input { padding: 8px; background: #111; border: 1px solid #444; color: white; border-radius: 4px; }
+        
+        #game-stage { position: relative; width: 800px; height: 600px; background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.5); overflow: hidden; transform-origin: center; transition: transform 0.2s; }
+        .game-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #map-layer { z-index: 1; } 
+        #item-layer { z-index: 2; } 
+        #entity-layer { z-index: 3; } 
+        #foreground-layer { z-index: 5; }
+        #ice-overlay { z-index: 6; pointer-events: none; opacity: 0; transition: opacity 2s; background: linear-gradient(to bottom, rgba(200,230,255,0.5) 0%, transparent 50%); }
+        #ui-canvas { z-index: 10; }
+        
+        .tile-img { position: absolute; width: 40px; height: 40px; object-fit: cover; }
+        .sprite { position: absolute; width: 40px; height: 40px; transition: top 0.2s ease-out, left 0.2s ease-out; object-fit: contain; }
+        .mob-sprite { filter: drop-shadow(0 0 2px red); }
+        .player-sprite { filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
+        
+        #game-ui { position: absolute; top: 20px; left: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 100; transition: all 0.3s; }
+        #squad-ui { background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; border-left: 5px solid var(--accent); min-width: 200px; }
+        #level-ui { background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 8px; font-size: 20px; font-weight: bold; color: #f1c40f; text-align: center; border: 2px solid #f1c40f; }
+        
+        .squad-member { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; }
+        .squad-status { width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; }
+        .alive { background: #2ecc71; } .dead { background: #e74c3c; } .frozen { background: #3498db; }
+        
+        #turn-timer { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 8px; font-size: 24px; font-weight: bold; color: #f1c40f; z-index: 10; }
+        
+        #twitch-status { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; font-size: 12px; color: #aaa; z-index: 100; }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: red; margin-right: 5px; }
+        .connected .status-dot { background: #00ff00; }
+        
+        #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: white; display: none; align-items: center; justify-content: center; font-size: 30px; font-weight: bold; z-index: 50; }
+        #ad-break-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(145, 71, 255, 0.3); color: white; display: none; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; z-index: 45; border: 4px solid #9147ff; pointer-events: none;}
+        
+        #admin-view { padding: 40px; overflow-y: auto; flex-direction: column; align-items: center; }
+        .panel-card { background: var(--bg-panel); padding: 20px; border-radius: 8px; width: 100%; max-width: 800px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .panel-card h2 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .setting-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 10px; border-radius: 5px; }
+        .file-upload-label { display: flex; align-items: center; gap: 10px; flex: 1; font-size: 13px; }
+        input[type="file"] { color: #ccc; width: 90px; }
+        .preview-thumb { width: 30px; height: 30px; background: #000; border: 1px solid #555; object-fit: cover; }
+        
+        #shop-view { background: #121212; flex-direction: column; }
+        #shop-header { background: linear-gradient(to right, #2c3e50, #4ca1af); padding: 40px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #shop-content { flex: 1; display: flex; padding: 20px; gap: 20px; justify-content: center; }
+        .shop-sidebar { width: 250px; background: var(--bg-panel); padding: 20px; border-radius: 8px; height: fit-content; }
+        .shop-grid { flex: 1; max-width: 900px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .item-card { background: #252525; border: 1px solid #333; border-radius: 8px; padding: 15px; text-align: center; transition: transform 0.2s; }
+        .item-card:hover { transform: translateY(-5px); border-color: var(--accent); }
+        .item-icon { font-size: 40px; margin-bottom: 10px; display: block; }
+        .item-price { color: #f1c40f; font-weight: bold; font-size: 18px; margin: 10px 0; }
+        button.buy-btn { background: var(--accent); border: none; color: white; padding: 8px 16px; border-radius: 4px; cursor: pointer; width: 100%; }
+        button.buy-btn:hover { background: #7c2cf1; }
+        
+        #chat-messages { flex: 1; overflow-y: hidden; padding: 10px; font-size: 13px; display: flex; flex-direction: column; justify-content: flex-end; }
+        .chat-line { padding: 4px 0; line-height: 1.4; opacity: 0.8; }
+        .chat-line.command { font-weight: bold; color: #d1d1d1; }
+        .chat-line.system { color: #a3a3a3; font-style: italic; }
+        .username { font-weight: bold; }
+        .active-user { color: #bf94ff; text-shadow: 0 0 5px rgba(145, 71, 255, 0.5); }
+        
+        /* FULLSCREEN MODE STYLES */
+        body.fullscreen-mode nav { display: none; }
+        body.fullscreen-mode #chat-container { display: none; }
+        body.fullscreen-mode #stream-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 200; background: black; }
+        
+        /* Exit Button */
+        #btn-exit-fs {
+            display: none;
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(231, 76, 60, 0.8); color: white;
+            border: none; padding: 10px 15px; border-radius: 4px;
+            cursor: pointer; z-index: 300; font-weight: bold;
+        }
+        body.fullscreen-mode #btn-exit-fs { display: block; }
+
+        /* UI Positioning in Fullscreen - Move to Side if space allows */
+        body.fullscreen-mode #game-ui {
+            left: 20px;
+            top: 20px;
+            /* In FS, the map centers, so left:20px might overlay. 
+               We will use JS resize to push it to the black bars if possible. */
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <h1>⚔️ Oars & Ores</h1>
+        <button id="btn-stream" class="nav-btn active" onclick="switchView('stream')">🔴 Stream View</button>
+        <button id="btn-admin" class="nav-btn" onclick="switchView('admin')">⚙️ Settings & Assets</button>
+        <button id="btn-shop" class="nav-btn" onclick="switchView('shop')">🛒 Player Shop</button>
+        <button class="nav-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+    </nav>
+
+    <div id="main-view">
+        <div id="stream-view" class="view-section active">
+            <div id="stream-container">
+                <button id="btn-exit-fs" onclick="toggleFullscreen()">❌ Exit Fullscreen (ESC)</button>
+                <div id="game-stage">
+                    <div id="map-layer" class="game-layer"></div>
+                    <div id="item-layer" class="game-layer"></div>
+                    <div id="entity-layer" class="game-layer"></div>
+                    <div id="foreground-layer" class="game-layer"></div>
+                    <div id="ice-overlay" class="game-layer"></div>
+                    <canvas id="ui-canvas" class="game-layer" width="800" height="600"></canvas>
+                    <div id="pause-overlay">⏸️ PAUSED (Tab Inactive)</div>
+                    <div id="ad-break-overlay">📺 AD BREAK ACTIVE<br><span style="font-size:16px">Fimbulwinter Paused</span></div>
+                </div>
+                <div id="game-ui">
+                     <div id="level-ui">LEVEL 1</div>
+                     <div id="squad-ui">
+                        <h3 style="margin: 0 0 10px 0; color: #9147ff;">CURRENT RAIDERS</h3>
+                        <div id="squad-list"></div>
+                    </div>
+                </div>
+                <div id="turn-timer">TICK: <span id="timer-val">Wait</span></div>
+                <div id="twitch-status"><span class="status-dot"></span> <span id="twitch-status-text">Disconnected (Simulating)</span></div>
+            </div>
+            <div id="chat-container">
+                <div style="padding: 15px; background: #1f1f23; border-bottom: 1px solid #333; font-weight: bold; text-align: center;">STREAM CHAT</div>
+                <div id="chat-messages"></div>
+                <div id="chat-controls">
+                    <div style="color: #aaa; font-size: 11px; margin-bottom: 5px;">Keys: <b>WASD</b> to move, <b>F</b> to Grab/Attack/Drop</div>
+                    <select id="chat-persona"><option value="Host">🎙️ Host (Console)</option></select>
+                    <input type="text" id="chat-input" placeholder="Type !up, !grab, etc..." onkeydown="handleChatInput(event)">
+                </div>
+            </div>
+        </div>
+
+        <div id="admin-view" class="view-section">
+            <div class="panel-card" style="border-left: 5px solid #9147ff;">
+                <h2>📡 Twitch Connection</h2>
+                <div class="setting-row">
+                    <label>Channel Name:</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="twitch-channel" placeholder="e.g. Ninja" style="width:150px;">
+                        <button onclick="connectTwitch()" id="btn-twitch-connect" style="background:#9147ff; border:none; color:white; padding:8px 15px; border-radius:4px; cursor:pointer;">Connect</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label>Simulate Chat (Spam):</label>
+                    <input type="checkbox" id="sim-toggle" checked onchange="toggleSimulation(this.checked)">
+                </div>
+                <div class="setting-row">
+                    <label>Manual Ad Break:</label>
+                    <button onclick="toggleAdBreak()" id="btn-ad-break" style="background:#e67e22; border:none; color:white; padding:8px 15px; border-radius:4px; cursor:pointer;">Start Ad Break</button>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; margin-bottom:15px; padding-bottom:5px;">
+                    <h2 style="border:none; margin:0;">🎨 Game Assets</h2>
+                    <div style="display:flex; gap:10px;">
+                        <label style="background:#3498db; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">📂 Load Save <input type="file" accept=".json" onchange="loadConfigFromFile(this)" style="display:none;"></label>
+                        <button onclick="saveConfigToFile()" style="background:#27ae60; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">💾 Save to File</button>
+                    </div>
+                </div>
+                <h3>Terrain & Frozen Variants</h3>
+                <div class="setting-grid">
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-grass1" class="preview-thumb"><label>Grass 1:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'grass1', 'prev-grass1')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-f_grass1" class="preview-thumb"><label>❄️ Frozen G1:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'f_grass1', 'prev-f_grass1')"></div>
+
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-grass2" class="preview-thumb"><label>Grass 2:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'grass2', 'prev-grass2')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-f_grass2" class="preview-thumb"><label>❄️ Frozen G2:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'f_grass2', 'prev-f_grass2')"></div>
+
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-wall" class="preview-thumb"><label>Rock Wall:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'wall', 'prev-wall')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-f_wall" class="preview-thumb"><label>❄️ Frozen Wall:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'f_wall', 'prev-f_wall')"></div>
+
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-wood" class="preview-thumb"><label>Wood Wall:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'wood', 'prev-wood')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-f_wood" class="preview-thumb"><label>❄️ Frozen Wood:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'f_wood', 'prev-f_wood')"></div>
+                </div>
+                
+                <h3>Ship & Water</h3>
+                <div class="setting-grid">
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-water" class="preview-thumb"><label>Water:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'water', 'prev-water')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-f_water" class="preview-thumb"><label>❄️ Frozen Water:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'f_water', 'prev-f_water')"></div>
+                    
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-ship_back" class="preview-thumb"><label>Ship Back:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'ship_back', 'prev-ship_back')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-ship_mid" class="preview-thumb"><label>Ship Mid:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'ship_mid', 'prev-ship_mid')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-ship_front" class="preview-thumb"><label>Ship Front:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'ship_front', 'prev-ship_front')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-ice" class="preview-thumb"><label>Ice Overlay:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'ice', 'prev-ice')"></div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>💰 Loot Tiers & Items</h3>
+                <div class="setting-grid">
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-loot1" class="preview-thumb"><label>Loot Lv1 (Gold):</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'loot1', 'prev-loot1')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-loot2" class="preview-thumb"><label>Loot Lv2 (Gem):</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'loot2', 'prev-loot2')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-loot3" class="preview-thumb"><label>Loot Lv3 (Rare):</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'loot3', 'prev-loot3')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-torch" class="preview-thumb"><label>Torch Item:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'torch', 'prev-torch')"></div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>🧟 Mob & Effect Assets</h3>
+                <div class="setting-grid">
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-mob1" class="preview-thumb"><label>Mob 1 (Weak):</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'mob1', 'prev-mob1')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-mob2" class="preview-thumb"><label>Mob 2 (Strong):</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'mob2', 'prev-mob2')"></div>
+                    <div class="setting-row"><div class="file-upload-label"><img id="prev-fire" class="preview-thumb"><label>Fire Effect:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'fire', 'prev-fire')"></div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h2>🎭 Character Skins</h2>
+                <div class="setting-grid">
+                    <div class="setting-row" style="border-left: 5px solid #e74c3c;"><div class="file-upload-label"><img id="prev-player0" class="preview-thumb"><label>Red:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'player0', 'prev-player0')"></div>
+                    <div class="setting-row" style="border-left: 5px solid #3498db;"><div class="file-upload-label"><img id="prev-player1" class="preview-thumb"><label>Blue:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'player1', 'prev-player1')"></div>
+                    <div class="setting-row" style="border-left: 5px solid #f1c40f;"><div class="file-upload-label"><img id="prev-player2" class="preview-thumb"><label>Yellow:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'player2', 'prev-player2')"></div>
+                    <div class="setting-row" style="border-left: 5px solid #9b59b6;"><div class="file-upload-label"><img id="prev-player3" class="preview-thumb"><label>Purple:</label></div><input type="file" accept="image/*" onchange="handleFileUpload(this, 'player3', 'prev-player3')"></div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h2>⚙️ Controls & Logic</h2>
+                <div class="setting-row">
+                    <label>Tick Rate (ms):</label>
+                    <input type="range" id="tick-slider" min="500" max="3000" value="1500" onchange="updateTickRate(this.value)" oninput="document.getElementById('tick-disp').innerText = this.value + 'ms'">
+                    <span id="tick-disp">1500ms</span>
+                </div>
+                <div class="setting-row">
+                    <label>Admin Add Player:</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="admin-add-name" placeholder="Name" style="width:100px;">
+                        <button onclick="adminAddPlayer()" style="background:#3498db; border:none; color:white; padding:5px 10px; border-radius:4px; cursor:pointer;">Add</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label>Set Level:</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="admin-level-val" value="1" min="1" style="width:60px;">
+                        <button onclick="adminSetLevel()" style="background:#e67e22; border:none; color:white; padding:5px 10px; border-radius:4px; cursor:pointer;">Set</button>
+                    </div>
+                </div>
+                <div class="setting-row" style="justify-content: center; gap: 10px;">
+                    <button onclick="triggerFimbulwinter()" style="background:#3498db; color:white; border:none; padding:15px 20px; font-size:16px; border-radius:4px; cursor:pointer;">❄️ Force Fimbulwinter</button>
+                    <button onclick="hardReset()" style="background: #e74c3c; color: white; border: none; padding: 15px 20px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer;">⚠ HARD RESET</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="shop-view" class="view-section">
+            <div id="shop-header">
+                <h1 style="margin: 0;">Viking Outpost</h1>
+                <p>Spend your hard-earned raid loot!</p>
+                <div style="margin-top:10px;">
+                    <button onclick="cheatGold()" style="background:#444; color:#aaa; border:1px solid #666; padding:5px 10px; cursor:pointer; font-size:12px;">🛠️ Debug: Add 1000g</button>
+                </div>
+            </div>
+            <div id="shop-content">
+                <div class="shop-sidebar">
+                    <h3>👤 User Profile</h3>
+                    <select id="shop-user-select" style="width: 100%; padding: 8px; margin-bottom: 10px; background: #111; color: white; border: 1px solid #444;" onchange="updateShopUI()"></select>
+                    <div style="background: #111; padding: 10px; border-radius: 4px; margin-top: 10px;">
+                        <div style="font-size: 12px; color: #888;">Current Balance</div>
+                        <div style="font-size: 24px; color: #f1c40f; font-weight: bold;">🪙 <span id="shop-balance">0</span></div>
+                    </div>
+                    <div style="margin-top: 20px;"><h4>Inventory</h4><ul id="shop-inventory" style="padding-left: 20px; font-size: 14px; color: #ccc;"><li>None</li></ul></div>
+                </div>
+                <div class="shop-grid">
+                    <div class="item-card"><span class="item-icon">🛡️</span><h3>Iron Helm</h3><p style="font-size: 12px; color: #aaa;">+1 Life per raid.</p><div class="item-price">500 Gold</div><button class="buy-btn" onclick="buyItem('Iron Helm', 500)">Purchase</button></div>
+                    <div class="item-card"><span class="item-icon">🫧</span><h3>Bubble Shield</h3><p style="font-size: 12px; color: #aaa;">Repels mobs for 10 ticks.</p><div class="item-price">150 Gold</div><button class="buy-btn" onclick="buyItem('Bubble Shield', 150)">Purchase</button></div>
+                    <div class="item-card"><span class="item-icon">👼</span><h3>God Mode Ring</h3><p style="font-size: 12px; color: #aaa;">Cheat Item: Invincibility.</p><div class="item-price">0 Gold</div><button class="buy-btn" onclick="buyItem('God Mode', 0)">Enable</button></div>
+                    <div class="item-card"><span class="item-icon">✨</span><h3>Golden Name</h3><div class="item-price">1000 Gold</div><button class="buy-btn" onclick="buyItem('Golden Name', 1000)">Purchase</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// --- CONFIG ---
+let CONFIG = { tileSize: 40, gridW: 20, gridH: 15, tickRate: 1500 };
+let ASSET_SRCS = {}; 
+
+function handleFileUpload(input, key, previewId) {
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            ASSET_SRCS[key] = e.target.result;
+            document.getElementById(previewId).src = e.target.result;
+            hotReloadAssets();
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// --- TWITCH ---
+let twitchConnected = false, simulationActive = true, botInterval = null;
+let isAdBreak = false; // New Ad Break Flag
+
+function connectTwitch() {
+    const channel = document.getElementById('twitch-channel').value;
+    if(!channel) { alert("Enter Channel Name!"); return; }
+    if(twitchConnected) {
+        ComfyJS.Disconnect(); twitchConnected = false;
+        document.getElementById('btn-twitch-connect').innerText = "Connect";
+        updateStatus("Disconnected (Simulating)", false); return;
+    }
+    ComfyJS.Init(channel); twitchConnected = true;
+    document.getElementById('btn-twitch-connect').innerText = "Disconnect";
+    updateStatus(`Connected to #${channel}`, true);
+}
+function toggleSimulation(active) {
+    simulationActive = active;
+    if(active && !botInterval) botInterval = setInterval(simulateChat, 500);
+    else if(!active && botInterval) { clearInterval(botInterval); botInterval = null; }
+}
+function toggleAdBreak() {
+    isAdBreak = !isAdBreak;
+    const btn = document.getElementById('btn-ad-break');
+    const overlay = document.getElementById('ad-break-overlay');
+    
+    if(isAdBreak) {
+        btn.innerText = "Stop Ad Break";
+        btn.style.background = "#c0392b";
+        overlay.style.display = "flex";
+        addSystemMessage("📺 AD BREAK STARTED! Fimbulwinter Paused.");
+    } else {
+        btn.innerText = "Start Ad Break";
+        btn.style.background = "#e67e22";
+        overlay.style.display = "none";
+        addSystemMessage("▶️ AD BREAK ENDED! Game Resumed.");
+    }
+}
+
+function updateStatus(msg, isGreen) {
+    document.getElementById('twitch-status-text').innerText = msg;
+    document.querySelector('#twitch-status .status-dot').style.background = isGreen ? '#00ff00' : 'red';
+    if(twitchConnected) document.getElementById('twitch-status').classList.add('connected');
+    else document.getElementById('twitch-status').classList.remove('connected');
+}
+ComfyJS.onCommand = (user, command, message, flags, extra) => {
+    if(command === "join") { handleJoin(user); return; }
+    const cmd = "!" + command.toLowerCase();
+    const allowed = ['!up', '!down', '!left', '!right', '!grab', '!drop', '!burn', '!attack'];
+    if(allowed.includes(cmd)) {
+        const p = players.find(pl => pl.name.toLowerCase() === user.toLowerCase());
+        if(p) { p.lastCmd = cmd; p.lastActiveTime = Date.now(); }
+    }
+}
+ComfyJS.onChat = (user, message, flags, self, extra) => {
+    const isActive = players.some(p => p.name.toLowerCase() === user.toLowerCase());
+    addChatMessage(user, message, isActive);
+}
+function handleJoin(username) {
+    let existing = USER_DATABASE.find(u => u.name.toLowerCase() === username.toLowerCase());
+    if(!existing) {
+        const newUser = { name: username, gold: 0, inventory: [] };
+        USER_DATABASE.push(newUser);
+        saveUserDataLocal();
+        const select = document.getElementById('shop-user-select');
+        const opt = document.createElement('option'); opt.value = USER_DATABASE.length-1; opt.innerText = username; select.appendChild(opt);
+        addSystemMessage(`👋 NEW RAIDER JOINED: ${username}`);
+    }
+}
+
+// --- SAVE/LOAD ---
+function saveConfigToFile() {
+    const saveData = { assets: ASSET_SRCS, config: CONFIG, users: USER_DATABASE };
+    const blob = new Blob([JSON.stringify(saveData)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'oars_full_backup.json'; a.click(); URL.revokeObjectURL(url);
+}
+function saveUserDataLocal() { localStorage.setItem('oars_users', JSON.stringify(USER_DATABASE)); }
+function loadUserDataLocal() {
+    const data = localStorage.getItem('oars_users');
+    if(data) {
+        const parsed = JSON.parse(data);
+        USER_DATABASE.splice(0, USER_DATABASE.length, ...parsed);
+        const select = document.getElementById('shop-user-select'); select.innerHTML = '';
+        USER_DATABASE.forEach((u, i) => { const opt = document.createElement('option'); opt.value = i; opt.innerText = u.name; select.appendChild(opt); });
+    }
+}
+function loadConfigFromFile(input) {
+    const file = input.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if(data.assets) ASSET_SRCS = data.assets;
+            if(data.config) CONFIG = data.config;
+            if(data.users) { USER_DATABASE.splice(0, USER_DATABASE.length, ...data.users); saveUserDataLocal(); }
+            for (const [key, src] of Object.entries(ASSET_SRCS)) {
+                const prev = document.getElementById('prev-' + key);
+                if (prev) prev.src = src;
+            }
+            const slider = document.getElementById('tick-slider');
+            if(slider) { slider.value = CONFIG.tickRate; document.getElementById('tick-disp').innerText = CONFIG.tickRate + 'ms'; }
+            hotReloadAssets(); updateShopUI(); alert('Settings Loaded Successfully!');
+        } catch(err) { alert('Error loading file: ' + err); }
+    }; reader.readAsText(file);
+}
+function updateTickRate(val) { CONFIG.tickRate = parseInt(val); lastTickTime = Date.now(); }
+
+// --- DATA ---
+const USER_DATABASE = [ { name: "xX_Slayer_Xx", gold: 1200, inventory: [] }, { name: "StreamerHost", gold: 99999, inventory: [] } ];
+const COLORS = ['#e74c3c', '#3498db', '#f1c40f', '#9b59b6']; 
+
+// --- GAME STATE ---
+const uiCanvas = document.getElementById('ui-canvas'); const ctx = uiCanvas.getContext('2d');
+let level = 1, map = [], mapVisuals = [], loot = [], mobs = [], players = [], squadNames = [];
+let lastTickTime = 0, isPaused = false;
+let fimbulwinterActive = false, fimbulRow = -1, fimbulTimer = 0, levelStartTime = 0;
+let fimbulManualTrigger = false;
+// 30,31,32=Ship, 40=Frozen
+const mapLayer = document.getElementById('map-layer'), itemLayer = document.getElementById('item-layer'), entityLayer = document.getElementById('entity-layer'), foregroundLayer = document.getElementById('foreground-layer');
+let tileElements = []; 
+
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { isPaused = true; document.getElementById('pause-overlay').style.display = 'flex'; } 
+    else { isPaused = false; document.getElementById('pause-overlay').style.display = 'none'; lastTickTime = Date.now(); }
+});
+
+// --- INIT ---
+function hardReset() { level = 1; mapLayer.innerHTML = ''; itemLayer.innerHTML = ''; entityLayer.innerHTML = ''; foregroundLayer.innerHTML = ''; selectNewSquad(); startLevel(); }
+function startLevel() {
+    itemLayer.innerHTML = ''; entityLayer.innerHTML = ''; foregroundLayer.innerHTML = '';
+    let valid = false, attempts = 0;
+    while(!valid && attempts < 50) { generateMap(); if (checkMapValidity()) valid = true; attempts++; }
+    document.getElementById('level-ui').innerText = "LEVEL " + level;
+    addSystemMessage(`⚔️ STARTING LEVEL ${level}!`);
+    
+    // Reset Fimbulwinter
+    fimbulwinterActive = false; fimbulManualTrigger = false; fimbulRow = -1; fimbulTimer = 0; levelStartTime = Date.now();
+    document.getElementById('ice-overlay').style.opacity = '0';
+
+    players.forEach((p, i) => {
+        p.x = 9 + (i%2); p.y = 11; p.holding = null; p.cooldown = 0; p.boatTime = 0; p.lastActiveTime = Date.now();
+        if(p.lives <= 0) p.lives = 1; 
+        p.frozen = false; // Status reset
+        
+        if (!p.isBot) {
+            const user = USER_DATABASE.find(u => u.name === p.name);
+            if(user) {
+                if(user.inventory.includes('God Mode')) { p.godMode = true; p.lives = 999; }
+                if(user.inventory.includes('Bubble Shield')) p.shield = 10; else p.shield = 0;
+            }
+        }
+        p.element = document.createElement('img'); p.element.className = 'sprite player-sprite'; entityLayer.appendChild(p.element);
+        const skinKey = 'player' + p.skinIndex; updateEntityVisuals(p, skinKey, p.color); p.element.style.display = 'block'; updateEntityPos(p);
+    });
+    renderMapDOM(); syncLootDOM(); syncMobsDOM();
+    lastTickTime = Date.now();
+    if (!window.renderRunning) { window.renderRunning = true; requestAnimationFrame(renderLoop); }
+    updateShopUI(); updateChatPersona(); saveUserDataLocal();
+    setTimeout(() => { const sel = document.getElementById('chat-persona'); if(players.length > 0) sel.value = players[0].name; }, 100);
+}
+
+function generateMap() {
+    map = []; mapVisuals = []; mobs = []; loot = [];
+    const wallDensity = Math.min(0.1 + (level * 0.02), 0.3); const woodDensity = level >= 3 ? 0.05 : 0; 
+    for(let y=0; y<CONFIG.gridH; y++) {
+        let row = []; let visRow = [];
+        for(let x=0; x<CONFIG.gridW; x++) {
+            visRow.push(Math.random() > 0.5 ? 1 : 2);
+            if (y > 12) { row.push(2); continue; } 
+            if (y === 12) { if(x === 9) { row.push(30); continue; } if(x === 10) { row.push(31); continue; } if(x === 11) { row.push(32); continue; } }
+            if (y > 9 && x > 7 && x < 13) { row.push(0); continue; }
+            const rand = Math.random();
+            if (rand < woodDensity) row.push(4); else if (rand < woodDensity + wallDensity) row.push(1); else row.push(0); 
+        }
+        map.push(row); mapVisuals.push(visRow);
+    }
+    const lootCount = 5 + level;
+    for(let i=0; i<lootCount; i++) {
+        const pos = findFreeSpot();
+        if(pos) {
+            let tier = 1; if (level > 2 && Math.random() > 0.7) tier = 2; if (level > 4 && Math.random() > 0.8) tier = 3;
+            loot.push({ type: 'gold', tier: tier, x: pos.x, y: pos.y, value: 25 * tier * level, symbol: tier === 3 ? '💎' : (tier === 2 ? '🔶' : '💰') });
+        }
+    }
+    if (level >= 3) { const pos = findFreeSpot(); if(pos) loot.push({ type: 'torch', tier: 1, x: pos.x, y: pos.y, value: 0, symbol: '🔥' }); }
+    const mobCount = 2 + Math.floor(level * 1.5);
+    for(let i=0; i<mobCount; i++) {
+        const pos = findFreeSpot();
+        if(pos) { mobs.push({ x: pos.x, y: pos.y, type: (level > 2 && Math.random() > 0.5) ? 2 : 1, hp: 1, moveTimer: 0, attackCooldown: 0 }); }
+    }
+}
+function findFreeSpot() {
+    let limit = 100;
+    while(limit-- > 0) {
+        let x = Math.floor(Math.random() * CONFIG.gridW); let y = Math.floor(Math.random() * (CONFIG.gridH - 3));
+        if (y >= 10 && x >= 8 && x <= 12) continue;
+        if(map[y][x] === 0) return {x, y};
+    } return null;
+}
+function checkMapValidity() {
+    let visited = new Set(); let queue = [{x: 9, y: 11}]; visited.add(`9,11`); let lootFound = 0;
+    while(queue.length > 0) {
+        const curr = queue.shift();
+        if(loot.find(l => l.x === curr.x && l.y === curr.y)) lootFound++;
+        [[0,1],[0,-1],[1,0],[-1,0]].forEach(d => {
+            const nx = curr.x + d[0], ny = curr.y + d[1];
+            if(nx >=0 && nx < CONFIG.gridW && ny >= 0 && ny < CONFIG.gridH) {
+                if((map[ny][nx] === 0 || map[ny][nx] >= 30 || map[ny][nx] === 5) && !visited.has(`${nx},${ny}`)) { visited.add(`${nx},${ny}`); queue.push({x: nx, y: ny}); }
+            }
+        });
+    } return lootFound >= Math.floor(loot.length * 0.8);
+}
+function selectNewSquad() {
+    players = []; squadNames = [];
+    let pool = [...USER_DATABASE].sort(() => 0.5 - Math.random());
+    let botIndex = 1;
+    while(pool.length < 4) pool.push({ name: `Bot_Viking${botIndex++}`, gold: 0, inventory: [], isBot: true });
+    let selectedUsers = pool.slice(0, 4);
+    selectedUsers.forEach((u, i) => {
+        squadNames.push(u.name);
+        players.push({ name: u.name, x: 9 + (i%2), y: 11, color: COLORS[i], skinIndex: i, holding: null, lives: u.inventory && u.inventory.includes('Iron Helm') ? 3 : 2, godMode: false, shield: 0, cooldown: 0, boatTime: 0, lastCmd: 'WAIT', lastActiveTime: Date.now(), isBot: u.isBot || false, frozen: false, element: null });
+        if(players[i].godMode) players[i].lives = 999;
+    });
+    updateSquadUI(); updateChatPersona();
+}
+
+// --- FIMBULWINTER & LOGIC ---
+function triggerFimbulwinter() {
+    fimbulwinterActive = true;
+    fimbulManualTrigger = true;
+    fimbulRow = -1;
+    addSystemMessage("❄️ FIMBULWINTER HAS BEGUN! RUN!");
+    document.getElementById('ice-overlay').style.opacity = '0.4';
+}
+
+function processFimbulwinter() {
+    if (isAdBreak) return; // Pause for Ads
+
+    const elapsed = Date.now() - levelStartTime;
+    if (!fimbulwinterActive && elapsed > 240000) {
+        triggerFimbulwinter();
+        fimbulManualTrigger = false; // Auto trigger, respect activity check
+    }
+
+    if (fimbulwinterActive) {
+        // Activity Check (Skip if manual or bots playing)
+        const anyActive = players.some(p => !p.isBot && (Date.now() - p.lastActiveTime < 45000));
+        const botsOnly = players.every(p => p.isBot);
+        
+        if (anyActive || fimbulManualTrigger || botsOnly || fimbulTimer === 0) {
+            fimbulTimer++;
+            if (fimbulTimer > 20) {
+                fimbulTimer = 0;
+                fimbulRow++;
+                if (fimbulRow < CONFIG.gridH) {
+                    addSystemMessage("❄️ The ice creeps closer...");
+                    // Freeze Row
+                    for(let x=0; x<CONFIG.gridW; x++) {
+                        // DO NOT OVERWRITE map id to 40, just update visual
+                        
+                        if(tileElements[fimbulRow] && tileElements[fimbulRow][x]) {
+                            // Update visual to Frozen Variant
+                            updateTileSrc(tileElements[fimbulRow][x], map[fimbulRow][x], mapVisuals[fimbulRow][x], true);
+                        }
+                        
+                        // Kill anyone here
+                        players.forEach(p => {
+                            if(p.y === fimbulRow && p.x === x && !p.frozen) {
+                                p.frozen = true;
+                                p.lives = 0; 
+                                if(p.holding) { p.holding = null; } 
+                                addSystemMessage(`❄️ ${p.name} froze to death!`);
+                            }
+                        });
+
+                        // Destroy Loot (Handle multiple items on one tile)
+                        for (let i = loot.length - 1; i >= 0; i--) {
+                            if (loot[i].x === x && loot[i].y === fimbulRow) {
+                                if (loot[i].element) loot[i].element.remove();
+                                loot.splice(i, 1);
+                            }
+                        }
+                    }
+                } else {
+                    endLevelLogic();
+                }
+            }
+        }
+    }
+}
+
+// --- LOOT BANKING CHECK ---
+function checkGroundLoot() {
+    // Check if any loot is sitting on ship tiles (30,31,32)
+    const bankedLoot = [];
+    loot.forEach(l => {
+        if(l.y < CONFIG.gridH && l.x < CONFIG.gridW) {
+            const t = map[l.y][l.x];
+            if(t >= 30) {
+                bankedLoot.push(l);
+            }
+        }
+    });
+    
+    if(bankedLoot.length > 0) {
+        let totalVal = 0;
+        bankedLoot.forEach(item => {
+            if(item.type === 'gold') {
+                totalVal += item.value;
+                if(item.element) item.element.remove();
+            }
+        });
+        
+        // Distribute to active players
+        const beneficiaries = players.filter(p => p.lives > 0 && !p.frozen && !p.isBot);
+        if(beneficiaries.length > 0) {
+            const share = Math.floor(totalVal / beneficiaries.length);
+            beneficiaries.forEach(p => {
+                const u = USER_DATABASE.find(db => db.name === p.name);
+                if(u) u.gold += share;
+            });
+            if(totalVal > 0) {
+                addSystemMessage(`💰 LOOT SECURED! (+${totalVal}G)`);
+                updateShopUI();
+                saveUserDataLocal();
+            }
+        }
+        
+        // Remove from array
+        loot = loot.filter(l => !bankedLoot.includes(l));
+    }
+}
+
+function gameTick() {
+    if (isPaused) return;
+    
+    processFimbulwinter();
+    checkGroundLoot(); // Auto-bank loot dropped on boat
+
+    let playersAlive = 0;
+    let itemMoveVotes = new Map(); let soloPlayers = [];
+
+    players.forEach(p => {
+        if (p.lives <= 0 || p.frozen) {
+            if(p.element) {
+                // Ghost style or frozen style
+                p.element.style.opacity = p.frozen ? '0.8' : '0.5';
+                p.element.style.filter = p.frozen ? 'hue-rotate(180deg)' : 'grayscale(100%)';
+            }
+            return;
+        }
+        playersAlive++;
+        if(p.shield > 0) p.shield--;
+        if(p.cooldown > 0) {
+            p.cooldown--;
+            p.lastCmd = 'WAIT';
+            return; 
+        }
+        
+        // AFK Drop
+        if (!p.isBot && Date.now() - p.lastActiveTime > 45000 && p.holding) {
+            p.holding = null; // Drop silently
+        }
+
+        // --- AFK BOAT KICK ---
+        const tile = map[p.y][p.x];
+        if (tile >= 30) {
+            p.boatTime++;
+            if(p.boatTime > 20) {
+                // Kick to shore
+                p.y = 11; 
+                p.boatTime = 0;
+                updateEntityPos(p);
+                addSystemMessage(`🦶 ${p.name} kicked from boat!`);
+            }
+        } else {
+            p.boatTime = 0;
+        }
+
+        // --- BOT LOGIC ---
+        if(p.isBot) {
+            handleBotBehavior(p);
+        }
+
+        // Parse Command
+        let dx = 0, dy = 0;
+        let cmd = p.lastCmd;
+        if (cmd === '!up') dy = -1;
+        else if (cmd === '!down') dy = 1;
+        else if (cmd === '!left') dx = -1;
+        else if (cmd === '!right') dx = 1;
+
+        if (cmd === '!grab' || cmd === '!drop') handleInteraction(p);
+        else if (cmd === '!burn') handleBurn(p);
+        else if (cmd === '!attack') handleAttack(p);
+        else if (dx !== 0 || dy !== 0) {
+            if(p.holding) {
+                if(!itemMoveVotes.has(p.holding)) itemMoveVotes.set(p.holding, []);
+                itemMoveVotes.get(p.holding).push({dx, dy, p});
+            } else {
+                soloPlayers.push({dx, dy, p});
+            }
+        }
+        p.lastCmd = 'WAIT';
+    });
+
+    // 2. Move Solos
+    soloPlayers.forEach(move => {
+        const {dx, dy, p} = move;
+        const tx = p.x + dx;
+        const ty = p.y + dy;
+        if (tx >= 0 && tx < CONFIG.gridW && ty >= 0 && ty < CONFIG.gridH) {
+            const t = map[ty][tx];
+            // Check walkability (Normal tiles + Ship + Burnt + NOT FROZEN)
+            if ((t === 0 || t >= 30 || t === 5) && ty > fimbulRow) { 
+                p.x = tx; p.y = ty; updateEntityPos(p); 
+            }
+        }
+    });
+
+    // 3. Move Items (Co-op Logic)
+    itemMoveVotes.forEach((votes, item) => {
+        const first = votes[0];
+        const allAgree = votes.every(v => v.dx === first.dx && v.dy === first.dy);
+        const allHolders = players.filter(pl => pl.holding === item && pl.lives > 0 && !pl.frozen);
+        const everyoneReady = allHolders.every(h => votes.some(v => v.p === h));
+        
+        if (allAgree && everyoneReady) {
+            const holders = allHolders.length;
+            let cooldown = 0;
+            // Solo Carry Penalty
+            if (holders === 1) {
+                if (item.tier === 1) cooldown = 1; 
+                else cooldown = 3; 
+            } 
+            
+            const tx = item.x + first.dx;
+            const ty = item.y + first.dy;
+            
+            if (tx >= 0 && tx < CONFIG.gridW && ty >= 0 && ty < CONFIG.gridH) {
+                const t = map[ty][tx];
+                if ((t === 0 || t >= 30 || t === 5) && ty > fimbulRow) {
+                    item.x = tx; item.y = ty;
+                    if(item.element) { item.element.style.left = (tx * CONFIG.tileSize) + 'px'; item.element.style.top = (ty * CONFIG.tileSize) + 'px'; }
+                    
+                    allHolders.forEach(h => {
+                        h.x = tx; h.y = ty;
+                        h.cooldown = cooldown; 
+                        updateEntityPos(h);
+                    });
+
+                    // Banking Logic
+                    if (t >= 30) {
+                        const val = item.value;
+                        if (val > 0) {
+                            addSystemMessage(`💰 TEAM BANKED (+${val}G)`);
+                            allHolders.forEach(h => {
+                                // Only give gold to real users
+                                if (!h.isBot) {
+                                    const userProfile = USER_DATABASE.find(u => u.name === h.name);
+                                    if(userProfile) userProfile.gold += Math.floor(val / holders);
+                                }
+                            });
+                            if(item.element) item.element.remove();
+                            loot = loot.filter(l => l !== item);
+                        } else {
+                             const pos = findFreeSpot();
+                             if(pos) { 
+                                 item.x = pos.x; item.y = pos.y;
+                                 if(item.element) {
+                                     item.element.style.left = (pos.x * CONFIG.tileSize) + 'px';
+                                     item.element.style.top = (pos.y * CONFIG.tileSize) + 'px';
+                                 }
+                             }
+                        }
+                        allHolders.forEach(h => h.holding = null);
+                        updateShopUI();
+                        saveUserDataLocal(); // Save on bank
+                    }
+                }
+            }
+        }
+    });
+
+    // MOB AI UPDATE
+    mobs.forEach(m => {
+        m.moveTimer++;
+        if (m.attackCooldown > 0) m.attackCooldown--; 
+
+        // MOB SPEED NERF (Move every 3 ticks)
+        const speed = 3; 
+        if (m.moveTimer >= speed) {
+            m.moveTimer = 0;
+            
+            // LAZY MOB LOGIC: 20% chance to idle
+            if (Math.random() < 0.20) return;
+
+            let target = null;
+            let minDist = 999;
+            players.forEach(p => {
+                if(p.lives > 0 && !p.frozen) {
+                    const d = Math.abs(p.x - m.x) + Math.abs(p.y - m.y);
+                    if(d < minDist) { minDist = d; target = p; }
+                }
+            });
+
+            if(target) {
+                // BUBBLE SHIELD REPULSION
+                if(target.shield > 0 && minDist <= 3) {
+                    // Flee from player
+                    let fx = 0, fy = 0;
+                    if(m.x < target.x) fx = -1; else if(m.x > target.x) fx = 1;
+                    if(m.y < target.y) fy = -1; else if(m.y > target.y) fy = 1;
+                    
+                    if (fx !== 0 && m.x+fx >= 0 && map[m.y][m.x+fx] === 0) m.x += fx;
+                    else if (fy !== 0 && m.y+fy >= 0 && map[m.y+fy][m.x] === 0) m.y += fy;
+                    updateEntityPos(m);
+                    return;
+                }
+
+                // Chasing Logic
+                let moveX = target.x - m.x;
+                let moveY = target.y - m.y;
+                let dx = 0, dy = 0;
+
+                if (Math.abs(moveX) > 0 && (Math.abs(moveX) >= Math.abs(moveY) || Math.random() > 0.5)) {
+                    dx = Math.sign(moveX);
+                } else if (Math.abs(moveY) > 0) {
+                    dy = Math.sign(moveY);
+                }
+
+                // Check collision
+                if (dx !== 0 && map[m.y][m.x+dx] === 0) {
+                    m.x += dx;
+                }
+                else if (dy !== 0 && map[m.y+dy][m.x] === 0) {
+                    m.y += dy;
+                }
+                else if (Math.random() > 0.5) {
+                     // Wait
+                } else {
+                     // Try alternate
+                     if (dx !== 0 && map[m.y+Math.sign(moveY)][m.x] === 0) m.y += Math.sign(moveY);
+                     else if (dy !== 0 && map[m.y][m.x+Math.sign(moveX)] === 0) m.x += Math.sign(moveX);
+                }
+                
+                updateEntityPos(m);
+
+                // ATTACK LOGIC 
+                if (m.x === target.x && m.y === target.y && m.attackCooldown === 0) {
+                    if (target.godMode) {
+                        addSystemMessage(`🛡️ ${target.name} is INVINCIBLE!`);
+                        m.attackCooldown = 2; 
+                    } else {
+                        target.lives--;
+                        addSystemMessage(`☠️ ${target.name} hit! (HP: ${target.lives})`);
+                        m.attackCooldown = 2; // Reduce cooldown so they hit faster
+                    }
+                }
+            }
+        }
+    });
+
+    const goldLootOnMap = loot.filter(l => l.type === 'gold').length;
+    const goldHeld = players.some(p => p.holding && p.holding.type === 'gold');
+    if (goldLootOnMap === 0 && !goldHeld) endLevelLogic();
+    if (playersAlive === 0) { addSystemMessage(`💀 TEAM WIPED. Resetting to Level 1.`); setTimeout(hardReset, 3000); }
+}
+
+function endLevelLogic() {
+    const survivors = players.filter(p => p.lives > 0 && !p.frozen && p.y >= 12 && p.x >= 9 && p.x <= 11);
+    if (survivors.length > 0) {
+        level++;
+        addSystemMessage(`🚀 ${survivors.length} SURVIVORS! Advancing...`);
+        saveUserDataLocal();
+        setTimeout(startLevel, 2000);
+    } else {
+        addSystemMessage(`💀 NO SURVIVORS. Resetting...`);
+        setTimeout(hardReset, 3000);
+    }
+}
+
+// --- DOM HELPERS ---
+function hotReloadAssets() {
+    // Only call renderMapDOM to rebuild visuals
+    renderMapDOM();
+    
+    // Refresh entities
+    players.forEach(p => { if(p.element) updateEntityVisuals(p, 'player'+p.skinIndex, p.color); });
+    mobs.forEach(m => { if(m.element) updateEntityVisuals(m, m.type===1?'mob1':'mob2', m.type===1?'#c0392b':'#000'); });
+    loot.forEach(l => { 
+        if(l.element) { 
+            let src = null; 
+            if(l.type === 'torch') src = ASSET_SRCS.torch; 
+            else if(l.type === 'gold') { 
+                if(l.tier === 1) src = ASSET_SRCS.loot1; 
+                else if(l.tier === 2) src = ASSET_SRCS.loot2; 
+                else if(l.tier === 3) src = ASSET_SRCS.loot3; 
+            } 
+            if(src) { 
+                l.element.src = src; 
+                l.element.style.backgroundColor = 'transparent'; 
+                l.element.style.borderRadius = '0'; 
+            } 
+        } 
+    });
+    if(ASSET_SRCS.ice) document.getElementById('ice-overlay').style.backgroundImage = `url(${ASSET_SRCS.ice})`;
+}
+
+function updateEntityVisuals(entity, assetKey, fallbackColor) { const src = ASSET_SRCS[assetKey]; if(src) { entity.element.src = src; entity.element.style.backgroundColor = 'transparent'; entity.element.style.borderRadius = '0'; } else { entity.element.removeAttribute('src'); entity.element.style.backgroundColor = fallbackColor; entity.element.style.borderRadius = '50%'; } }
+function renderMapDOM() { 
+    mapLayer.innerHTML = ''; 
+    foregroundLayer.innerHTML = ''; 
+    tileElements = []; 
+    
+    for(let y=0; y<CONFIG.gridH; y++) { 
+        let row = []; 
+        for(let x=0; x<CONFIG.gridW; x++) { 
+            const img = document.createElement('img'); 
+            img.className = 'tile-img'; 
+            img.style.left = (x * CONFIG.tileSize) + 'px'; 
+            img.style.top = (y * CONFIG.tileSize) + 'px'; 
+            
+            // Re-apply frozen state properly during render
+            const isFrozen = y <= fimbulRow;
+            updateTileSrc(img, map[y][x], mapVisuals[y][x], isFrozen); 
+            
+            mapLayer.appendChild(img); 
+            row.push(img); 
+            
+            // SHIP FOREGROUND LOGIC
+            if(map[y][x] >= 30 && map[y][x] <= 32) {
+                const imgSail = document.createElement('img');
+                imgSail.className = 'tile-img';
+                imgSail.style.left = (x * CONFIG.tileSize) + 'px';
+                imgSail.style.top = ((y-1) * CONFIG.tileSize) + 'px'; // Shift up 1 tile
+                
+                // Get Source
+                let src = null;
+                if(map[y][x] === 30) src = ASSET_SRCS.ship_back;
+                if(map[y][x] === 31) src = ASSET_SRCS.ship_mid;
+                if(map[y][x] === 32) src = ASSET_SRCS.ship_front;
+                
+                if(src) {
+                    imgSail.src = src;
+                    // Clip bottom half so we only see the top (sail) part
+                    imgSail.style.objectPosition = "top";
+                    imgSail.style.height = "40px";
+                    foregroundLayer.appendChild(imgSail);
+                }
+            }
+        } 
+        tileElements.push(row); 
+    } 
+}
+
+function updateTileSrc(img, tile, visual, isFrozen) {
+    let src = null;
+    let usingFallback = false;
+    
+    // Logic for Frozen Assets
+    if (isFrozen) {
+        if (tile === 0) src = visual === 1 ? ASSET_SRCS.f_grass1 : ASSET_SRCS.f_grass2;
+        else if (tile === 1) src = ASSET_SRCS.f_wall;
+        else if (tile === 2) src = ASSET_SRCS.f_water;
+        else if (tile === 4) src = ASSET_SRCS.f_wood;
+        // Fallback to normal if frozen asset missing
+        if (!src) usingFallback = true;
+    } 
+    
+    if (!src) {
+        if (tile === 0) src = visual === 1 ? ASSET_SRCS.grass1 : ASSET_SRCS.grass2;
+        else if (tile === 1) src = ASSET_SRCS.wall;
+        else if (tile === 2) src = ASSET_SRCS.water;
+        else if (tile === 4) src = ASSET_SRCS.wood;
+        else if (tile === 5) src = ASSET_SRCS.fire;
+        else if (tile === 30) src = ASSET_SRCS.ship_back;
+        else if (tile === 31) src = ASSET_SRCS.ship_mid;
+        else if (tile === 32) src = ASSET_SRCS.ship_front;
+        else if (tile === 40) src = ASSET_SRCS.ice; // Generic ice
+    }
+
+    if(src) {
+        img.src = src;
+        img.style.backgroundColor = 'transparent';
+        
+        // Handle Ship "Deck" Clipping (Bottom half only)
+        if(tile >= 30 && tile <= 32) {
+             img.style.objectPosition = "bottom";
+             img.style.height = "40px";
+        } else {
+             img.style.height = "40px";
+             img.style.objectPosition = "center";
+        }
+
+        // Smart Tint: Only tint if we wanted a frozen asset but fell back to normal
+        if(isFrozen && usingFallback) img.style.filter = "hue-rotate(180deg) brightness(1.2)";
+        else img.style.filter = "none";
+    } else {
+        img.removeAttribute('src');
+        // Colors
+        if (tile === 0) img.style.backgroundColor = isFrozen ? '#74b9ff' : '#5d9e58';
+        else if (tile === 1) img.style.backgroundColor = isFrozen ? '#2c3e50' : '#3e2723';
+        else if (tile === 2) img.style.backgroundColor = isFrozen ? '#a29bfe' : '#2980b9';
+        else if (tile >= 30) img.style.backgroundColor = '#8e44ad';
+        else if (tile === 4) img.style.backgroundColor = isFrozen ? '#bdc3c7' : '#d35400';
+        else if (tile === 5) img.style.backgroundColor = '#2c3e50';
+        else if (tile === 40) img.style.backgroundColor = '#ecf0f1';
+        
+        img.style.filter = "none";
+    }
+}
+function updateEntityPos(entity) { if(entity.element) { entity.element.style.left = (entity.x * CONFIG.tileSize) + 'px'; entity.element.style.top = (entity.y * CONFIG.tileSize) + 'px'; } }
+function syncLootDOM() { itemLayer.innerHTML = ''; loot.forEach(l => { const el = document.createElement('img'); el.className = 'sprite'; el.style.left = (l.x * CONFIG.tileSize) + 'px'; el.style.top = (l.y * CONFIG.tileSize) + 'px'; let src = null; if(l.type === 'torch') src = ASSET_SRCS.torch; else if(l.type === 'gold') { if(l.tier === 1) src = ASSET_SRCS.loot1; else if(l.tier === 2) src = ASSET_SRCS.loot2; else if(l.tier === 3) src = ASSET_SRCS.loot3; } if (src) el.src = src; else { el.style.backgroundColor = 'gold'; el.style.borderRadius = '50%'; el.style.width = '20px'; el.style.height = '20px'; el.style.margin = '10px'; if(l.tier === 2) el.style.border = '2px solid cyan'; if(l.tier === 3) el.style.border = '2px solid purple'; } itemLayer.appendChild(el); l.element = el; }); }
+function syncMobsDOM() { entityLayer.querySelectorAll('.mob-sprite').forEach(el => el.remove()); mobs.forEach(m => { if(!m.element) { const el = document.createElement('img'); el.className = 'sprite mob-sprite'; entityLayer.appendChild(el); m.element = el; updateEntityVisuals(m, m.type===1?'mob1':'mob2', m.type===1?'#c0392b':'#000'); updateEntityPos(m); } }); }
+
+// Improved Bot AI
+function handleBotBehavior(p) {
+    if (p.lives <= 0 || p.frozen) return;
+
+    // 0. Nerf: Small chance to hesitate (stops them from being perfect speedrunners)
+    if (Math.random() < 0.15) { p.lastCmd = 'WAIT'; return; }
+
+    // 1. Holding Item -> Run to Boat
+    if (p.holding) {
+        const move = getNextMove(p.x, p.y, 10, 12);
+        p.lastCmd = move;
+    } 
+    // 2. Not Holding -> Find Loot
+    else {
+        let closest = null;
+        let minDist = 999;
+        
+        loot.forEach(l => {
+            const d = Math.abs(l.x - p.x) + Math.abs(l.y - p.y);
+            if (d < minDist) { minDist = d; closest = l; }
+        });
+
+        if (closest) {
+            if (p.x === closest.x && p.y === closest.y) p.lastCmd = '!grab';
+            else {
+                const move = getNextMove(p.x, p.y, closest.x, closest.y);
+                p.lastCmd = move;
+            }
+        } else {
+            // 3. No Loot -> Run to Boat
+            const distToBoat = Math.abs(p.x - 10) + Math.abs(p.y - 12);
+            if (distToBoat > 1) {
+                p.lastCmd = getNextMove(p.x, p.y, 10, 12);
+            } else {
+                p.lastCmd = 'WAIT';
+            }
+        }
+    }
+
+    // 4. Anti-Stuck / Idle Fix: If logic said WAIT but we aren't at objective, wander randomly
+    if (p.lastCmd === 'WAIT') {
+         // Check if we are actually at boat (safe)
+         const onBoat = p.y >= 12;
+         if (!onBoat && !p.holding && loot.length > 0) {
+             // We should be moving but aren't. Wander.
+             const dirs = [{c:'!up', dx:0, dy:-1}, {c:'!down', dx:0, dy:1}, {c:'!left', dx:-1, dy:0}, {c:'!right', dx:1, dy:0}];
+             const validDirs = dirs.filter(d => {
+                 const nx = p.x + d.dx, ny = p.y + d.dy;
+                 if(nx >= 0 && nx < CONFIG.gridW && ny >= 0 && ny < CONFIG.gridH) {
+                     const t = map[ny][nx];
+                     // Avoid ice and walls
+                     return (t === 0 || t >= 30 || t === 5) && ny > fimbulRow;
+                 }
+                 return false;
+             });
+             if (validDirs.length > 0) {
+                 p.lastCmd = validDirs[Math.floor(Math.random() * validDirs.length)].c;
+             }
+         }
+    }
+}
+
+function getNextMove(sx, sy, ex, ey) { 
+    // Basic BFS that respects frozen zones (avoid y <= fimbulRow)
+    let queue = [{x: sx, y: sy, path: []}]; 
+    let visited = new Set(); 
+    visited.add(`${sx},${sy}`); 
+    
+    while(queue.length > 0) { 
+        let curr = queue.shift(); 
+        if(curr.x === ex && curr.y === ey) return curr.path[0]; 
+        
+        const dirs = [{x:0, y:-1, c:'!up'}, {x:0, y:1, c:'!down'}, {x:-1, y:0, c:'!left'}, {x:1, y:0, c:'!right'}]; 
+        for(let d of dirs) { 
+            let nx = curr.x + d.x, ny = curr.y + d.y; 
+            if(nx >= 0 && nx < CONFIG.gridW && ny >= 0 && ny < CONFIG.gridH) { 
+                const t = map[ny][nx]; 
+                // Walkable AND Safe (not frozen)
+                if ((t === 0 || t >= 30 || t === 5) && ny > fimbulRow && !visited.has(`${nx},${ny}`)) { 
+                    visited.add(`${nx},${ny}`); 
+                    queue.push({x: nx, y: ny, path: [...curr.path, d.c]}); 
+                } 
+            } 
+        } 
+    } 
+    return 'WAIT'; 
+}
+
+function handleInteraction(p) { if (p.holding) { p.holding = null; p.lastCmd = "DROPPED"; } else { const adjMob = mobs.find(m => Math.abs(m.x - p.x) + Math.abs(m.y - p.y) <= 1); if(adjMob) { handleAttack(p); return; } const item = loot.find(l => l.x === p.x && l.y === p.y); if (item) { p.holding = item; p.lastCmd = item.type === 'torch' ? "GOT TORCH" : "GRABBED"; } else { if(p.holding && p.holding.type === 'torch') handleBurn(p); else p.lastCmd = "MISSED"; } } }
+function handleAttack(p) { const targets = mobs.filter(m => Math.abs(m.x - p.x) + Math.abs(m.y - p.y) <= 1); if(targets.length > 0) { targets.forEach(t => { t.hp -= 1; let dx = t.x - p.x, dy = t.y - p.y; if (t.x+dx >= 0 && t.x+dx < CONFIG.gridW && map[t.y][t.x+dx] === 0) t.x += dx; if (t.y+dy >= 0 && t.y+dy < CONFIG.gridH && map[t.y+dy][t.y] === 0) t.y += dy; t.attackCooldown = 5; updateEntityPos(t); if(t.hp <= 0) { addSystemMessage(`⚔️ ${p.name} KILLED A MOB!`); if(t.element) t.element.remove(); } }); mobs = mobs.filter(m => m.hp > 0); p.lastCmd = "ATTACKED"; const fx = document.createElement('div'); fx.innerText = '💥'; fx.style.position = 'absolute'; fx.style.left = (p.x * CONFIG.tileSize) + 'px'; fx.style.top = (p.y * CONFIG.tileSize) + 'px'; fx.style.fontSize = '20px'; fx.style.zIndex = 100; document.getElementById('game-stage').appendChild(fx); setTimeout(() => fx.remove(), 500); } else p.lastCmd = "SWING"; }
+function handleBurn(p) { if (p.holding && p.holding.type === 'torch') { const dirs = [[0,1], [0,-1], [1,0], [-1,0]]; let burned = false; for(let d of dirs) { const nx = p.x + d[0], ny = p.y + d[1]; if (map[ny][nx] === 4) { map[ny][nx] = 5; updateTileSrc(tileElements[ny][nx], 5, 0, false); burned = true; addSystemMessage(`🔥 ${p.name} burned a path!`); break; } } if (burned) { const pos = findFreeSpot(); if(pos) { p.holding.x = pos.x; p.holding.y = pos.y; updateEntityPos(p.holding); } p.holding = null; p.lastCmd = "BURNED"; } else p.lastCmd = "NO TARGET"; } else p.lastCmd = "NO TORCH"; }
+
+function renderLoop() {
+    const now = Date.now();
+    if (!isPaused) { const elapsed = now - lastTickTime; if (elapsed >= CONFIG.tickRate) { gameTick(); lastTickTime = now; } }
+    ctx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+    loot.forEach(l => { const px = l.x * CONFIG.tileSize + CONFIG.tileSize/2, py = l.y * CONFIG.tileSize + CONFIG.tileSize/2; if(!ASSET_SRCS.torch && l.type === 'torch') ctx.fillText('🔥', px, py); if(!ASSET_SRCS.loot1 && l.type === 'gold') ctx.fillText(l.symbol, px, py); });
+    players.forEach(p => { if(p.lives <= 0 && !p.frozen) return; const px = p.x * CONFIG.tileSize + CONFIG.tileSize/2, py = p.y * CONFIG.tileSize + CONFIG.tileSize/2; ctx.shadowColor = 'black'; ctx.shadowBlur = 3; ctx.fillStyle = p.godMode ? '#f1c40f' : (p.isBot ? '#ccc' : 'white'); ctx.font = 'bold 10px Arial'; ctx.fillText(p.name, px, py - 25); if(p.godMode) { ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py - 5, 20, 0, Math.PI*2); ctx.stroke(); } if(p.shield > 0) { ctx.strokeStyle = '#3498db'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py + 5, 22, 0, Math.PI*2); ctx.stroke(); } ctx.shadowBlur = 0; if (p.lastCmd !== 'WAIT' && !p.frozen) { ctx.fillStyle = 'white'; ctx.fillRect(px + 10, py - 10, 50, 20); ctx.fillStyle = 'black'; ctx.font = 'bold 10px Arial'; ctx.fillText(p.lastCmd.replace('!', ''), px + 35, py); } });
+    const pct = Math.min((now - lastTickTime) / CONFIG.tickRate, 1); ctx.fillStyle = isPaused ? '#555' : '#f1c40f'; ctx.fillRect(0, uiCanvas.height - 10, uiCanvas.width * (1-pct), 10); requestAnimationFrame(renderLoop);
+}
+
+window.addEventListener('keydown', (e) => {
+    if(!document.getElementById('stream-view').classList.contains('active')) return;
+    if(document.activeElement === document.getElementById('chat-input')) return;
+    const persona = document.getElementById('chat-persona').value; const p = players.find(pl => pl.name === persona);
+    if(p && !p.isBot) {
+        if(e.key === 'w' || e.key === 'ArrowUp') p.lastCmd = '!up';
+        if(e.key === 's' || e.key === 'ArrowDown') p.lastCmd = '!down';
+        if(e.key === 'a' || e.key === 'ArrowLeft') p.lastCmd = '!left';
+        if(e.key === 'd' || e.key === 'ArrowRight') p.lastCmd = '!right';
+        if(e.key === 'f') { const enemyNear = mobs.some(m => Math.abs(m.x - p.x) + Math.abs(m.y - p.y) <= 1); if(enemyNear) p.lastCmd = '!attack'; else if (p.holding && p.holding.type === 'torch') p.lastCmd = '!burn'; else if (p.holding) p.lastCmd = '!drop'; else p.lastCmd = '!grab'; }
+    }
+});
+function updateChatPersona() { const sel = document.getElementById('chat-persona'); sel.innerHTML = '<option value="Host">🎙️ Host (Console)</option>'; players.forEach(p => { if(!p.isBot) { const opt = document.createElement('option'); opt.value = p.name; opt.innerText = `👤 ${p.name}`; sel.appendChild(opt); } }); }
+function handleChatInput(e) { if(e.key === 'Enter') { const input = document.getElementById('chat-input'); const text = input.value.trim(); const persona = document.getElementById('chat-persona').value; if(text) { submitChat(persona, text); input.value = ''; } } }
+function submitChat(user, text) { const isSquad = squadNames.includes(user); addChatMessage(user, text, isSquad); if(text.startsWith('!')) { const p = players.find(pl => pl.name === user); if(p) { p.lastCmd = text; p.lastActiveTime = Date.now(); } else addSystemMessage(`(Viewer ${user} tried ${text})`); } }
+function switchView(viewName) { document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active')); document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active')); if (viewName === 'stream') { document.getElementById('stream-view').classList.add('active'); document.getElementById('btn-stream').classList.add('active'); } else if (viewName === 'admin') { document.getElementById('admin-view').classList.add('active'); document.getElementById('btn-admin').classList.add('active'); } else if (viewName === 'shop') { document.getElementById('shop-view').classList.add('active'); document.getElementById('btn-shop').classList.add('active'); } }
+function updateShopUI() { const idx = document.getElementById('shop-user-select').value || 0; const user = USER_DATABASE[idx]; if(user) { document.getElementById('shop-balance').innerText = user.gold; const invList = document.getElementById('shop-inventory'); invList.innerHTML = ''; if (user.inventory.length === 0) invList.innerHTML = '<li>None</li>'; else user.inventory.forEach(item => { const li = document.createElement('li'); li.innerText = item; invList.appendChild(li); }); } }
+function buyItem(itemName, cost) { const idx = document.getElementById('shop-user-select').value; const user = USER_DATABASE[idx]; if (user.gold >= cost) { user.gold -= cost; if (!user.inventory.includes(itemName) || itemName === 'Iron Helm') user.inventory.push(itemName); const activePlayer = players.find(p => p.name === user.name); if(activePlayer) { if(itemName === 'God Mode') { activePlayer.godMode = true; activePlayer.lives = 999; addSystemMessage(`👼 ${activePlayer.name} is now INVINCIBLE!`); } if(itemName === 'Iron Helm') { activePlayer.lives += 1; addSystemMessage(`🛡️ ${activePlayer.name} equipped Iron Helm (+1 HP)`); } if(itemName === 'Bubble Shield') { activePlayer.shield = 10; addSystemMessage(`🫧 ${activePlayer.name} activated Bubble Shield!`); } } saveUserDataLocal(); alert(`Purchased ${itemName}!`); updateShopUI(); } else alert("Not enough Gold!"); }
+function cheatGold() { const idx = document.getElementById('shop-user-select').value; const user = USER_DATABASE[idx]; user.gold += 1000; updateShopUI(); saveUserDataLocal(); }
+function adminSetLevel() { const val = parseInt(document.getElementById('admin-level-val').value); if(val) { level = val; startLevel(); alert('Level set to ' + level); } }
+function adminAddPlayer() { const name = document.getElementById('admin-add-name').value; if(name) { USER_DATABASE.push({ name: name, gold: 0, inventory: [] }); saveUserDataLocal(); alert(`User ${name} added! Reset round to include them.`); const select = document.getElementById('shop-user-select'); const opt = document.createElement('option'); opt.value = USER_DATABASE.length-1; opt.innerText = name; select.appendChild(opt); } }
+const chatContainer = document.getElementById('chat-messages');
+function addChatMessage(user, text, isActive) { const div = document.createElement('div'); div.className = 'chat-line'; if (text.startsWith('!')) div.classList.add('command'); const color = isActive ? '#bf94ff' : '#aaa'; const activeClass = isActive ? 'active-user' : ''; div.innerHTML = `<span class="username ${activeClass}" style="color:${color}">${user}:</span> ${text}`; chatContainer.appendChild(div); chatContainer.scrollTop = chatContainer.scrollHeight; if (chatContainer.children.length > 50) chatContainer.removeChild(chatContainer.firstChild); }
+function addSystemMessage(text) { const div = document.createElement('div'); div.className = 'chat-line system'; div.innerHTML = `🤖 <b>SYSTEM:</b> ${text}`; chatContainer.appendChild(div); chatContainer.scrollTop = chatContainer.scrollHeight; }
+function updateSquadUI() { const list = document.getElementById('squad-list'); list.innerHTML = ''; players.forEach(p => { const div = document.createElement('div'); div.className = 'squad-member'; div.innerHTML = `<div class="squad-status ${p.lives > 0 ? 'alive' : (p.frozen ? 'frozen' : 'dead')}" style="background: ${p.color}"></div><span style="color: white; font-weight: bold;">${p.name}</span><span style="margin-left: auto; color: #ccc;">${p.lives} ❤️</span>`; list.appendChild(div); }); }
+function simulateChat() { if(!simulationActive) return; const user = USER_DATABASE[Math.floor(Math.random() * USER_DATABASE.length)].name; const isSquad = squadNames.includes(user); let msg = ""; if (isSquad) { if (Math.random() > 0.3) { const cmds = ['!up', '!down', '!left', '!right', '!grab', '!drop', '!burn', '!attack']; msg = cmds[Math.floor(Math.random() * cmds.length)]; } else msg = "Hold on!"; } else { if (Math.random() > 0.8) msg = "!join"; else msg = ['lol', 'pog', 'run', 'gg'].sort(()=>0.5-Math.random())[0]; } addChatMessage(user, msg, isSquad); if(msg === '!join') handleJoin(user); }
+
+const select = document.getElementById('shop-user-select'); select.innerHTML = ''; loadUserDataLocal(); if(USER_DATABASE.length === 0) { USER_DATABASE.push({ name: "xX_Slayer_Xx", gold: 1200, inventory: [] }); USER_DATABASE.push({ name: "StreamerHost", gold: 99999, inventory: [] }); } USER_DATABASE.forEach((u, i) => { const opt = document.createElement('option'); opt.value = i; opt.innerText = u.name; select.appendChild(opt); });
+hardReset(); toggleSimulation(true); 
+
+// FULLSCREEN TOGGLE
+function toggleFullscreen() {
+    const body = document.body;
+    body.classList.toggle('fullscreen-mode');
+    
+    // Auto scale game stage to fit screen
+    const stage = document.getElementById('game-stage');
+    if(body.classList.contains('fullscreen-mode')) {
+        const scaleX = window.innerWidth / 800;
+        const scaleY = window.innerHeight / 600;
+        const scale = Math.min(scaleX, scaleY);
+        stage.style.transform = `scale(${scale})`;
+        stage.style.margin = "auto"; // Center it
+        stage.style.top = `${(window.innerHeight - (600*scale))/2}px`;
+    } else {
+        stage.style.transform = "none";
+        stage.style.margin = "0";
+        stage.style.top = "0";
+    }
+}
+
+// Window Resize Handling for Fullscreen
+window.addEventListener('resize', () => {
+    if(document.body.classList.contains('fullscreen-mode')) {
+        toggleFullscreen(); toggleFullscreen(); // Quick refresh of scale logic
+    }
+});
+
+</script>
+</body>
+</html>
